@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Bash script to invoke a PacBio python tool. Python script to be run
+# is specified as the first command line parameter. The rest of the
+# parameters are passed to the script.
+
+####set -o verbose
+set -o errexit
+set -o nounset
+
+tools=~ts6/work/new-pipeline-dev/tools/trunk/PacBioEDA   # you'll need to change this
+
+export SEYMOUR_HOME=/software/PacBio/smrtanalysis        # and this
+
+export PYTHONPATH=${SEYMOUR_HOME}/analysis/lib/python2.5:${PYTHONPATH:=}
+export PYTHONPATH=$tools:${PYTHONPATH:=}
+
+export LD_LIBRARY_PATH=${SEYMOUR_HOME}/analysis/lib:${LD_LIBRARY_PATH:=}
+export LD_LIBRARY_PATH=${SEYMOUR_HOME}/analysis/lib/atlas:${LD_LIBRARY_PATH:=}
+export LD_LIBRARY_PATH=${SEYMOUR_HOME}/common/lib:${LD_LIBRARY_PATH:=}
+
+export PATH=${SEYMOUR_HOME}/redist/python2.5/bin:${PATH:=}     # use PacBio-supplied python
+
+which=$1
+shift
+
+$tools/$which $*
+
