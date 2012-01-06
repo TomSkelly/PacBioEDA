@@ -1,0 +1,180 @@
+
+This is a tools package for performing fairly low-level exploratory
+data analysis on sequence data from a Pacific Biosciences instrument.
+
+The scripts typically take as input a .bas.h5 file, as produced by the
+primary analysis software running on the instrument server. Some
+scripts also expect a .cmp.h5 file containing alignments produced by
+the secondary analysis step.
+
+The scripts are in Python, since that seems to be the native language
+of PacBio. Keep in mind that I'm a Python newbie, so they will not be
+as idiomatically correct as I'd like.
+
+The scripts (and their supporting packages) are described at a high
+level here. If you want to know more detail about what a script does
+and how, use the Force: read the source. I am a fairly loquacious
+commenter.
+
+Feedback and patches are always welcome.
+
+Tom Skelly (tom.skelly@sanger.ac.uk)
+
+
+How to install:
+~~~~~~~~~~~~~~
+
+Installation is trivial: Just untar the tar file to a location of your
+choice. It will create a subdirectory called PacBio-EDA-<version>
+containing the scripts. The only configuration required is to tell the
+scripts where to find the supporting Python modules they require, as
+described in the next section.
+
+How to run:
+~~~~~~~~~~
+
+In theory, the scripts can be run directly from the command
+line. However, they need to be told where to find the relevant Python
+packages (my modules, plus numpy, matplotlib, h5py, etc). That can be
+done by permanently setting PATH, PYTHONPATH, and LD_LIBRARY_PATH in
+your shell profile, or by running the scripts via the run_pac shell
+script included here. The settings in run_pac are a subset of those in
+smrtanalysis/etc/setup.sh. You'll need to modify run_pac in a couple
+of places (indicated by comments) to point to your installation
+directories.
+
+Note that, in particular, the python executable itself (which the
+scripts find via $PATH) should be the one supplied in the smrtanalysis
+release (currently python 2.5). If you mix and match (even different
+installations of v2.5), you may see obscure errors having to do with
+UTF8 encodings. Use the run_pac script to get all this right.
+
+
+Scripts:
+~~~~~~~
+
+* PacBio_BasSummary.py:
+
+Python script to print summary information about the contents of a
+*.bas.h5 file, as produced by the PacBio instrument. Provides counts
+of reads, subreads and bases for a hierarchy of increasingly
+restrictive subsets of subreads:
+
+      Total contents of bas file
+        Sequencing ZMWs
+          Productivity-0 Sequencing ZMWs
+          Productivity-1 Sequencing ZMWs
+            Reads with HQ region length > threshold
+              Reads with HQ score > threshold
+                Reads with average insert size > threshold (i.e., not adapter dimers)
+                  Reads which aligned (if a .cmp.h5 file was supplied)
+          Productivity-2 Sequencing ZMWs
+
+All of the above except average insert size are criteria applied by
+the filtering step of secondary analysis.
+
+Inputs are a .bas.h5 file and (optionally) a .cmp.h5 file, specified
+as command line parameters. Filtering parameters can be overridden
+on the command line. See the --help option for details. Output is to
+stdout.
+
+
+* PacBio_Bas.py:
+
+Print detailed data from *.bas.h5 file and (optionally) the *.cmp.h5
+alignments file on a region-by-region basis. If a cmp.h5 file is
+supplied, it prints the alignment outcome for each region. First
+parameter is input *.bas.h5 file. Optional second parameter is
+*.cmp.h5 file. Output is to stdout, redirect with >.
+
+NOTE: For help in interpreting the various line types printed by
+this script, do "run_pac PacBio_Bas.py --linehelp".
+
+
+* PacBio_BasFilteredSubreads.py:
+
+Python script to extract filtered subreads from a bas.h5 file, and
+write them to a fasta file. By default, it will reproduce the
+sec/data/filtered_subreads.fasta file for the set described by the
+input .bas.h5 file. Different filtering parameters can be specified
+as command line parameters.
+
+The main reason for the existence of this script is to convince
+myself that I understand how filtering works. But it also provides a
+quick way to extract a set of reads from a .bas.h5 file.
+
+
+* PacBio_FindAdapt.py:
+
+Read a PacBio bas.h5 file, extract the sequence for a ZMW specified
+on the command line, align it to the adapter sequence, and output a
+plot of Smith-Waterman alignment scores at each position in the
+read. By default, output is to file ZMW-zzzzz.png, where zzzzz is
+the zero-padded ZMW number -- this can be overridden on the command
+line. Optional command line parameters specify a 0-based inclusive
+range of bases within the read.
+
+
+* PacBio_Show.py:
+
+Read a PacBio bas.h5 file, print a range of sequence from a specified
+ZMW in fasta format. Command line parameters are bas.h5 file name and
+ZMW#. Options include 0-based start and stop offsets.
+
+
+* PacBio_HQ.py
+
+Plot the number of ZMWs in pre-HQ, HQ, and post-HQ status as a
+function of time.
+
+
+* PacBio_HQHistory.py
+
+Create a time-stepped series of plots showing the spatial
+distribution on the SMRTcell of ZMWs in their HQ regions.
+
+* PacBio_XY.py
+
+Create a plot of ZMW status by x/y position on the SMRTcell. First
+parameter is input hdf5 file. Output png file is optional command
+line parameter, defaulting to XY.png.
+
+
+* PacBio_Productivity.py
+
+Create a plot of ZMW productivity by x/y position on the
+SMRTcell. First parameter is input .bas.h5 file. Output png file is
+optional command line parameter, defaulting to productivity.png.
+
+
+* PacBio_Dump.py:
+
+Dump a generic hdf5 file. Doesn't know anything about PacBio
+formats. First (only) parameter is input hdf5 file. Output is to
+stdout.
+
+
+Modules:
+~~~~~~~
+
+* H5BasFile.py:
+
+Support for common operations reading a PacBio bas.h5 file.
+
+
+* H5CmpFile.py:
+
+Package for accessing data from PacBio cmp.h5 alignment files.
+
+
+* SWAligner.py:
+
+Python module implementing a Smith-Waterman aligner with fixed gap
+penalty. NOTE: This is not going to be fast! It's intended for small
+jobs like finding adapters. We need a C version for the heavy lifting.
+
+
+* tt_log.py:
+
+Tiny module setting up parameters for Python logger for use by these
+scripts.
