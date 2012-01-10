@@ -25,10 +25,12 @@ How to install:
 ~~~~~~~~~~~~~~
 
 Installation is trivial: Just untar the tar file to a location of your
-choice. It will create a subdirectory called PacBio-EDA-<version>
-containing the scripts. The only configuration required is to tell the
-scripts where to find the supporting Python modules they require, as
-described in the next section.
+choice. It will create a subdirectory called
+TomSkelly-PacBioEDA-<version> containing the scripts. (You'll probably
+want to create a link to that directory with a more meaningful name.)
+The only configuration further required is to tell the scripts where
+to find the supporting Python modules they require, as described in
+the next section.
 
 How to run:
 ~~~~~~~~~~
