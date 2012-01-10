@@ -94,7 +94,7 @@ def printFasta (bf, hole, start, end, flen):
 
 def getParms ():                       # use default input sys.argv[1:]
 
-    parser = optparse.OptionParser()
+    parser = optparse.OptionParser(usage='%prog [options] <bas_file>')
 
     parser.add_option ('--score',     type='int', help='Minimum HQ region score (def: %default)')
     parser.add_option ('--length',    type='int', help='Minimum HQ region length (def: %default)')

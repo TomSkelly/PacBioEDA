@@ -103,7 +103,7 @@ def main ():
 
 def getParms ():                       # use default input sys.argv[1:]
 
-    parser = optparse.OptionParser(usage='%prog [options] <bas_file> <ZMW#>')
+    parser = optparse.OptionParser(usage='%prog [options] <bas_file>')
 
     parser.add_option ('--start', type='int', help='Time of first plot in seconds (def: %default)')
     parser.add_option ('--step',  type='int', help='Time interval between plots in seconds (def: %default)')

@@ -66,7 +66,7 @@ def main ():
 
 def getParms ():                       # use default input sys.argv[1:]
 
-    parser = optparse.OptionParser(usage='%prog [options] <bas_file> <ZMW#>')
+    parser = optparse.OptionParser(usage='%prog [options] <bas_file>')
 
     parser.add_option ('--output', help='Output file name (def: %default)')
 
