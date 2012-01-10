@@ -1,0 +1,8 @@
+
+This directory contains examples of the output from the various
+PacBioEDA scripts. In most cases, the example file is the direct
+output of the script. In the case of PacBio_Bas-exerpts.txt, the file
+contains a subset of the output of PacBio_Bas.py (which totalled xxMB)
+for a few selected ZMWs of interest, with explanatory annotations
+added by hand.
+

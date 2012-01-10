@@ -1,0 +1,320 @@
+
+Before you get too far into this, do "run_pac PacBio_Bas.py
+--linehelp" to get an explanation of how the output lines are
+formatted.
+
+What follows is the output for a few interesting ZMWs, excerpted from
+a 32MB output file.
+
+Let's start with an example that gets it *almost* right:
+
+  3573   2.303  SEQ    1 I       0   398    398
+  3573   2.996  SEQ    1 I     440   892    452
+  3573   2.509  SEQ    1 I+    925  1388    463  453   1  -  367259653  367260139     4     929    1382   15  32  65  6.1
+  3573   2.847  SEQ    1 I+   1432  1937    505  484   1  +  367259656  367260131     9    1441    1925   13  64  55  5.6
+  3573   2.530  SEQ    1 I+   1980  2447    467  390   1  -  367259666  367260072    62    2042    2432   13  27  43  6.7
+  3573   1.520  SEQ    1 I+   2496  2992    496  350   1  +  367259705  367260068    39    2535    2885    7  22  35  7.4
+  3573   2.418  SEQ    1 I+   3031  3516    485  474   1  -  367259660  367260143     0    3031    3505   23  40  49  6.3
+  3573   2.818  SEQ    1 I+   3558  4020    462  446   1  +  367259663  367260140    15    3573    4019   15  24  55  6.8
+  3573   2.074  SEQ    1 I+   4060  4531    471  441   1  -  367259671  367260139     4    4064    4505   12  23  50  7.2
+  3573   3.140  SEQ    1 I    4576  5129    553
+  3573   2.200  SEQ    1 I+   5171  5628    457  435   1  -  367259660  367260137     9    5180    5615    8  18  60  7.0
+  3573   3.033  SEQ    1 I+   5669  6117    448  373   1  +  367259691  367260094    33    5702    6075   17  21  51  6.2
+  3573   2.588  SEQ    1 I+   6159  6649    490  438   1  -  367259679  367260130    19    6178    6616   10  27  40  7.5
+  3573   2.946  SEQ    1 I+   6693  7165    472  455   1  +  367259658  367260137    11    6704    7159   12  26  50  7.1
+  3573   2.449  SEQ    1 I+   7205  7735    530  495   1  -  367259660  367260115    23    7228    7723   11  76  36  6.0
+  3573   2.667  SEQ    1 I+   7788  8781    993  469   1  -  367259648  367260139   520    8308    8777   15  26  48  7.2
+  3573   3.083  SEQ    1 I+   8826  9272    446  428   1  +  367259657  367260124     1    8827    9255   18  15  54  6.9
+  3573   2.775  SEQ    1 I+   9310  9764    454  415   1  -  367259664  367260114    24    9334    9749   15  14  49  7.3
+  3573   0.819  SEQ    1 I+   9805 10310    505  448   1  +  367259664  367260141    11    9816   10264   12  18  47  7.6
+  3573   3.017  SEQ    1 A     398   440
+  3573   2.417  SEQ    1 A     892   925
+  3573   2.651  SEQ    1 A    1388  1432
+  3573   2.586  SEQ    1 A    1937  1980
+  3573   2.197  SEQ    1 A    2447  2496
+  3573   2.310  SEQ    1 A    2992  3031
+  3573   3.333  SEQ    1 A    3516  3558
+  3573   2.622  SEQ    1 A    4020  4060
+  3573   2.592  SEQ    1 A    4531  4576
+  3573   3.333  SEQ    1 A    5129  5171
+  3573   2.660  SEQ    1 A    5628  5669
+  3573   3.547  SEQ    1 A    6117  6159
+  3573   1.471  SEQ    1 A    6649  6693
+  3573   4.082  SEQ    1 A    7165  7205
+  3573   2.578  SEQ    1 A    7735  7788
+  3573   2.662  SEQ    1 A    8781  8826
+  3573   2.615  SEQ    1 A    9272  9310
+  3573   1.321  SEQ    1 A    9764  9805
+  3573   2.554  SEQ    1 H+      0 10289             score: 773  HQ: 10289  read: 10310  dur: 4490.936  b/sec:  2.296
+
+ZMW 3573 is 10310 bases long. Its High Quality (H+) region includes
+almost all of that: the first 10289 bases. It's divided into 19
+subreads, with an insert size in the 450-490 range. Most of those (the
+I+ lines) aligned to the reference at offsets like 3672596xx (don't
+panic: the reference included many concatenated contigs!). Based on
+the alignments, the read qualities are in the range from Q6.0 to Q7.6.
+
+The strand pattern of the alignments is mostly OK. We missed what
+should have been a + alignment at 4576-5129. That subread's size is a
+bit large: 553. So it probably contained too many insertion errors to
+align.
+
+But what's happening with the subreads at 7205 and 7788? They align
+consecutively both to the - strand. However, note that subread at 7788
+is 993 bases long -- twice the expected size. Also note that only 469
+bases of that aligned, starting 520 bases into the subread. So it
+looks like the subread really should have been split into two, the
+first of which would have aligned to the + strand.
+
+What happened? We must have missed an adapter in the vicinity of
+offset 8300. Have a look at the plot in ZMW-03573.png. This is the
+output of PacBio_FindAdapt.py for ZMW 3573. It shows nicely spaced
+adapter peaks. There's a peak at 8300 -- but it's a little one. It's
+easy to believe that it was missed.
+
+----------------------
+
+Here's another example: according to PacBio_BasSummary-example.txt,
+ZMW 15185 produced the longest aligned subread. Here's what the whole
+ZMW looked like:
+
+ 15185   2.261  SEQ    1 I+      0  5197   5197 4524   1  +  143842865  143847392     0       0    4524   98 355 358  7.5
+ 15185   3.901  SEQ    1 I+   5248 12905   7657 7643   1  -  143841162  143847825    14    5262   12905  149 1304 324  6.3
+ 15185   2.665  SEQ    1 I+  12954 13514    560  506   1  +  143841195  143841661    45   12999   13505   10  65  25  7.0
+ 15185   3.545  SEQ    1 A    5197  5248
+ 15185   3.926  SEQ    1 A   12905 12954
+ 15185   3.004  SEQ    1 H+      0 13513             score: 802  HQ: 13513  read: 13514  dur: 4498.336  b/sec:  3.004
+
+Not bad. The total read was 13514 bases, and all but the last base
+were in the ZMW's HQ region. The read was split into three subreads,
+of lengths 5197, 7657 and 560 bases. Of those, 4524, 7643 and 506
+bases aligned -- a total of 12673 bases, as reported in the summary.
+
+The adapters separating the sunreads show up nicely in ZMW-15185.png.
+
+That polymerase was hard at work: it averaged 3.004 bases per second.
+
+----------------------
+
+Here's the next ZMW, 15186:
+
+ 15186   0.135  SEQ    2 i       0   607    607
+ 15186   0.000  SEQ    2 h       0     0             score:   0  HQ:     0  read:   607  dur: 4497.856  b/sec:  0.135
+
+In 4497 seconds, that polymerase managed only 607 bases -- 0.135
+b/.sec. It was called a Productivity-2 read, and no HQ region was
+declared, and hence no alignment was attempted.
+
+----------------------
+
+Finally, there is ZMW 2355:
+
+  2355   0.000  SEQ    1 is      0     0      0
+  2355   1.665  SEQ    1 ia     44   111     67  23   1   AT-TCTCTCA-CA-CAA-A-CGGAG-AGCG-GGAA--GAGAG-GTAT
+                         i2                               ATCTCTCTCAACAACAACAACGGAGGAG-GAGGAAAAGAGAGAG-AT
+  2355   0.000  SEQ    1 Is    150   150      0
+  2355   0.000  SEQ    1 Is    197   197      0
+  2355   0.000  SEQ    1 Is    238   236     -2
+  2355   0.000  SEQ    1 Is    279   275     -4
+  2355   4.688  SEQ    1 Is    322   323      1
+  2355   0.943  SEQ    1 Is    363   365      2
+  2355   5.357  SEQ    1 Is    404   405      1
+  2355   0.000  SEQ    1 Is    445   441     -4
+  2355   0.000  SEQ    1 Is    486   483     -3
+  2355   0.000  SEQ    1 Is    528   528      0
+  2355   0.000  SEQ    1 Is    569   566     -3
+  2355   0.000  SEQ    1 Is    610   610      0
+  2355   1.736  SEQ    1 Is    651   684     33
+  2355   0.000  SEQ    1 Is    725   725      0
+  2355   2.314  SEQ    1 Is    766   800     34
+  2355   0.000  SEQ    1 Is    843   843      0
+  2355   3.571  SEQ    1 Is    885   887      2
+  2355   0.000  SEQ    1 Is    926   926      0
+  2355   1.849  SEQ    1 Is    968  1004     36
+  2355   0.000  SEQ    1 Is   1055  1055      0
+  2355   7.500  SEQ    1 Is   1103  1104      1
+  2355   0.000  SEQ    1 Is   1145  1145      0
+  2355   0.000  SEQ    1 Is   1186  1185     -1
+  2355   0.000  SEQ    1 Is   1230  1230      0
+  2355   1.944  SEQ    1 Is   1273  1306     33
+  2355   6.429  SEQ    1 Is   1348  1351      3
+  2355   2.626  SEQ    1 Is   1391  1425     34
+  2355   0.000  SEQ    1 Is   1463  1463      0
+  2355   0.000  SEQ    1 Is   1504  1502     -2
+  2355   0.000  SEQ    1 Is   1545  1541     -4
+  2355   0.000  SEQ    1 Is   1586  1585     -1
+  2355   2.381  SEQ    1 Is   1634  1636      2
+  2355   0.000  SEQ    1 Is   1676  1676      0
+  2355   0.000  SEQ    1 Is   1719  1719      0
+  2355   7.500  SEQ    1 Is   1762  1764      2
+  2355   6.429  SEQ    1 Is   1804  1807      3
+  2355   0.000  SEQ    1 Is   1845  1841     -4
+  2355   0.000  SEQ    1 Is   1886  1884     -2
+  2355   0.000  SEQ    1 Is   1927  1926     -1
+  2355   0.000  SEQ    1 Is   1968  1965     -3
+  2355   0.000  SEQ    1 Is   2009  2009      0
+  2355   0.000  SEQ    1 Is   2050  2048     -2
+  2355   0.000  SEQ    1 Is   2094  2094      0
+  2355   0.000  SEQ    1 Is   2137  2137      0
+  2355   3.846  SEQ    1 Is   2179  2181      2
+  2355   1.339  SEQ    1 Is   2220  2222      2
+  2355   0.000  SEQ    1 Is   2261  2261      0
+  2355   0.000  SEQ    1 Is   2302  2302      0
+  2355   1.962  SEQ    1 Is   2343  2379     36
+  2355   0.000  SEQ    1 Is   2423  2423      0
+  2355   0.000  SEQ    1 Is   2468  2468      0
+  2355   0.000  SEQ    1 Is   2509  2507     -2
+  2355   2.679  SEQ    1 is   2556  2557      1
+  2355   0.000  SEQ    1 is   2597  2597      0
+  2355   2.206  SEQ    1 is   2638  2639      1
+  2355   0.000  SEQ    1 is   2679  2676     -3
+  2355   2.935  SEQ    1 is   2721  2757     36
+  2355   0.000  SEQ    1 is   2798  2798      0
+  2355   0.000  SEQ    1 is   2839  2837     -2
+  2355   1.992  SEQ    1 is   2880  2939     59  18
+  2355   0.000  SEQ    1 is   2976  2976      0
+  2355   1.116  SEQ    1 is   3017  3048     31
+  2355   1.173  SEQ    1 is   3092  3120     28
+  2355   2.009  SEQ    1 is   3156  3190     34
+  2355   1.001  SEQ    1 i    3229  3350    121
+  2355   1.204  SEQ    1 i    3389  3610    221
+  2355   1.785  SEQ    1 is   3644  3704     60  14
+  2355   0.000  SEQ    1 is   3741  3739     -2
+  2355   0.000  SEQ    1 is   3786  3784     -2
+  2355   0.000  SEQ    1 is   3828  3826     -2
+  2355   1.096  SEQ    1 is   3871  3905     34
+  2355   1.866  SEQ    1 i    3943  4053    110
+  2355   1.557  SEQ    1 is   4093  4133     40
+  2355   9.375  SEQ    1 is   4173  4175      2
+  2355   1.054  SEQ    1 i    4215  4315    100
+  2355   2.406  SEQ    1 is   4359  4395     36
+  2355   0.000  SEQ    1 is   4432  4432      0
+  2355   0.794  SEQ    1 i    4473  4622    149
+  2355   0.254  SEQ    1 is   4666  4701     35
+  2355   2.561  SEQ    1 is   4735  4773     38
+  2355   1.793  SEQ    1 is   4812  4843     31
+  2355   1.321  SEQ    1 i    4879  5137    258
+  2355   1.565  SEQ    1 is   5176  5246     70  13
+  2355   0.000  SEQ    1 is   5294  5294      0
+  2355   1.321  SEQ    1 is   5344  5382     38
+  2355   1.272  SEQ    1 i    5428  5688    260
+  2355   2.020  SEQ    1 is   5724  5790     66  11
+  2355   1.402  SEQ    1 i    5829  6349    520
+  2355   2.149  SEQ    1 is   6387  6418     31
+  2355   0.000  SEQ    1 is   6456  6453     -3
+  2355   2.038  SEQ    1 is   6499  6529     30
+  2355   2.002  SEQ    1 is   6570  6598     28
+  2355   2.459  SEQ    1 is   6632  6634      2
+  2355   0.000  SEQ    1 is   6673  6671     -2
+  2355   1.393  SEQ    1 is   6714  6759     45  10
+  2355   0.962  SEQ    1 A       0    44
+  2355   2.598  SEQ    1 A     111   150
+  2355   1.139  SEQ    1 A     150   197
+  2355   2.050  SEQ    1 A     197   238
+  2355   1.687  SEQ    1 A     236   279
+  2355   1.771  SEQ    1 A     275   322
+  2355   2.022  SEQ    1 A     323   363
+  2355   2.167  SEQ    1 A     365   404
+  2355   1.828  SEQ    1 A     405   445
+  2355   2.331  SEQ    1 A     441   486
+  2355   2.045  SEQ    1 A     483   528
+  2355   1.622  SEQ    1 A     528   569
+  2355   2.313  SEQ    1 A     566   610
+  2355   1.641  SEQ    1 A     610   651
+  2355   1.985  SEQ    1 A     684   725
+  2355   2.085  SEQ    1 A     725   766
+  2355   2.421  SEQ    1 A     800   843
+  2355   0.760  SEQ    1 A     843   885
+  2355   2.100  SEQ    1 A     887   926
+  2355   2.414  SEQ    1 A     926   968
+  2355   1.851  SEQ    1 A    1004  1055
+  2355   2.624  SEQ    1 A    1055  1103
+  2355   1.705  SEQ    1 A    1104  1145
+  2355   2.917  SEQ    1 A    1145  1186
+  2355   2.355  SEQ    1 A    1185  1230
+  2355   3.206  SEQ    1 A    1230  1273
+  2355   2.818  SEQ    1 A    1306  1348
+  2355   3.049  SEQ    1 A    1351  1391
+  2355   0.709  SEQ    1 A    1425  1463
+  2355   2.360  SEQ    1 A    1463  1504
+  2355   2.085  SEQ    1 A    1502  1545
+  2355   2.197  SEQ    1 A    1541  1586
+  2355   0.461  SEQ    1 A    1585  1634
+  2355   2.259  SEQ    1 A    1636  1676
+  2355   2.129  SEQ    1 A    1676  1719
+  2355   1.430  SEQ    1 A    1719  1762
+  2355   1.043  SEQ    1 A    1764  1804
+  2355   0.622  SEQ    1 A    1807  1845
+  2355   1.963  SEQ    1 A    1841  1886
+  2355   2.359  SEQ    1 A    1884  1927
+  2355   1.514  SEQ    1 A    1926  1968
+  2355   1.430  SEQ    1 A    1965  2009
+  2355   1.914  SEQ    1 A    2009  2050
+  2355   1.594  SEQ    1 A    2048  2094
+  2355   2.391  SEQ    1 A    2094  2137
+  2355   2.788  SEQ    1 A    2137  2179
+  2355   3.298  SEQ    1 A    2181  2220
+  2355   2.691  SEQ    1 A    2222  2261
+  2355   2.516  SEQ    1 A    2261  2302
+  2355   2.310  SEQ    1 A    2302  2343
+  2355   2.679  SEQ    1 A    2379  2423
+  2355   2.532  SEQ    1 A    2423  2468
+  2355   1.921  SEQ    1 A    2468  2509
+  2355   0.473  SEQ    1 A    2507  2556
+  2355   2.366  SEQ    1 a    2557  2597
+  2355   1.688  SEQ    1 a    2597  2638
+  2355   1.714  SEQ    1 a    2639  2679
+  2355   2.444  SEQ    1 a    2676  2721
+  2355   1.820  SEQ    1 a    2757  2798
+  2355   2.707  SEQ    1 a    2798  2839
+  2355   0.671  SEQ    1 a    2837  2880
+  2355   1.438  SEQ    1 a    2939  2976
+  2355   1.573  SEQ    1 a    2976  3017
+  2355   1.931  SEQ    1 a    3048  3092
+  2355   1.744  SEQ    1 a    3120  3156
+  2355   1.544  SEQ    1 a    3190  3229
+  2355   2.089  SEQ    1 a    3350  3389
+  2355   1.832  SEQ    1 a    3610  3644
+  2355   2.370  SEQ    1 a    3704  3741
+  2355   1.667  SEQ    1 a    3739  3786
+  2355   2.018  SEQ    1 a    3784  3828
+  2355   2.183  SEQ    1 a    3826  3871
+  2355   1.704  SEQ    1 a    3905  3943
+  2355   1.645  SEQ    1 a    4053  4093
+  2355   1.621  SEQ    1 a    4133  4173
+  2355   1.778  SEQ    1 a    4175  4215
+  2355   1.950  SEQ    1 a    4315  4359
+  2355   2.275  SEQ    1 a    4395  4432
+  2355   2.058  SEQ    1 a    4432  4473
+  2355   2.288  SEQ    1 a    4622  4666
+  2355   1.951  SEQ    1 a    4701  4735
+  2355   2.481  SEQ    1 a    4773  4812
+  2355   1.900  SEQ    1 a    4843  4879
+  2355   2.309  SEQ    1 a    5137  5176
+  2355   1.385  SEQ    1 a    5246  5294
+  2355   1.457  SEQ    1 a    5294  5344
+  2355   2.168  SEQ    1 a    5382  5428
+  2355   1.808  SEQ    1 a    5688  5724
+  2355   1.870  SEQ    1 a    5790  5829
+  2355   2.093  SEQ    1 a    6349  6387
+  2355   1.823  SEQ    1 a    6418  6456
+  2355   2.226  SEQ    1 a    6453  6499
+  2355   2.328  SEQ    1 a    6529  6570
+  2355   1.165  SEQ    1 a    6598  6632
+  2355   1.083  SEQ    1 a    6634  6673
+  2355   2.093  SEQ    1 a    6671  6714
+  2355   1.727  SEQ    1 H+      0  2518             score: 773  HQ:  2518  read:  6759  dur: 4498.589  b/sec:  1.502
+
+
+This was a decent read, 6759 bases, with a substantial HQ region. But
+the read was chopped into a lot of tiny subreads. Some were so small
+as to be called negative lengths. The read consists mostly of
+adapters, stacked end-to-end-to end. This is confirmed by the
+PacBio_FindAdapt.py plot ZMW-02355.png: it's nothing but adapter
+peaks. The molecule being sequenced was some sort of adapter dimer.
+
+We can also see one case where a subread was called an insert, but it
+really looked like as adapter: at offset 44 in the read. There is an
+pair of lines flagged ia/i2 showing the alignment of the adapter (i2)
+to the subread (ia).
+

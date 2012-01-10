@@ -1,0 +1,19 @@
+
+file:  /nfs/sf45/pacbio/superfoo/15362_343/C01_6/Analysis_Results/m111217_020247_00127_c100242772554400000315048203121237_s1_p0.bas.h5
+
+longest read was ZMW 4523 at 15025 bases
+
+statistics for subreads:
+
+reads subreads      bases     max    ZMW  criterion
+
+81741   286600  123724811   15025   4523  Total
+75153   279581  119710012   15025   4523  --Sequencing
+17531    17548    7851940     524   1615  ----Productivity-0
+ 2244    11847    7608162   13797  57750  ----Productivity-1
+ 2241    11844    7603416   13797  57750  ------HQ Len >= 50
+ 2241    11844    7603416   13797  57750  --------HQ Score >= 750
+ 2182     6870    7268523   13797  57750  ----------Insert >= 100
+ 1200     2451    1750287   12673  15185  ------------Aligned
+55378   250186  104249910   15025   4523  ----Productivity-2
+
