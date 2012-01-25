@@ -117,7 +117,13 @@ def main ():
                     rStart, rEnd = align['rStart'], align['rEnd']   # fetch once, used many times
                     alnLen = rEnd-rStart
                     nMM, nIns, nDel = align['nMM'], align['nIns'], align['nDel']
-                    Q = -10.0 * math.log10 (float(nMM + nIns + nDel) / float(alnLen)) if alnLen > 0 else 0.0
+                    totErrors = nMM + nIns + nDel
+                    if totErrors == 0:
+                        Q = 40.0
+                    elif alnLen <= 0:
+                        Q = 0.0
+                    else:
+                        Q = -10.0 * math.log10 (float(totErrors) / float(alnLen))
 
                     print "%4d  %2d  %1s  %9d  %9d  %4d  %6d  %6d  %3d %3d %3d %4.1f" % \
                         (alnLen,                               # length of aligned portion of read
