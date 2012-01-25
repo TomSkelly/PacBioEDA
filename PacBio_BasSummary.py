@@ -11,15 +11,21 @@
 #       Total contents of bas file
 #         Sequencing ZMWs
 #           Productivity-0 Sequencing ZMWs
+#           Productivity-2 Sequencing ZMWs
 #           Productivity-1 Sequencing ZMWs
 #             Reads with HQ region length > threshold
 #               Reads with HQ score > threshold
 #                 Reads with average insert size > threshold (i.e., not adapter dimers)
 #                   Reads which aligned (if a .cmp.h5 file was supplied)
-#           Productivity-2 Sequencing ZMWs
 
 # All of the above except average insert size are criteria applied by
 # the filtering step of secondary analysis.
+
+# Also reported is the ZMW# with the longest insert which passes all
+# the criteria. In particular, for the aligned inserts line, total
+# bases counts all aligned bases in all inserts of all reads, but the
+# max length for a single ZMW reports the longest contiguous alignment
+# in a single insert.
 
 # Inputs are a .bas.h5 file and (optionally) a .cmp.h5 file, specified
 # as command line parameters. Filtering parameters can be overridden
@@ -63,7 +69,7 @@ def main ():
     prod1C   = Counter('----Productivity-1')
     HQLenC   = Counter('------HQ Len >= %s' % opt.length)
     HQScoreC = Counter('--------HQ Score >= %s' % opt.score)
-    adaptC   = Counter('----------Insert >= %s' % opt.insert)
+    adaptC   = Counter('----------Avg Insert >= %s' % opt.insert)
     alignC   = Counter('------------Aligned')
     prod2C   = Counter('----Productivity-2')
 
@@ -86,12 +92,13 @@ def main ():
         maxSubreadLen   = 0
         cumSubreadLen   = 0
         alignedSubreads = 0
-        alignedBases    = 0
+        alignedTotBases = 0                           # total aligned bases in all inserts
+        alignedMaxBases = 0                           # longest alignment in single insert
 
         for region in bf.holeRegions(hole):
 
             regionHole, regionType, start, end, score = region
-            if regionType == 1:                   # if insert
+            if regionType == 1:                       # if insert
                 numSubreads += 1
                 maxSubreadLen  = max (end-start, maxSubreadLen)
                 cumSubreadLen += max (end-start, 0)   # clip negative lengths to zero
@@ -101,7 +108,9 @@ def main ():
 
                     if align is not None:                            # if the region aligned
                         alignedSubreads += 1
-                        alignedBases    += align['rEnd'] - align ['rStart']
+                        alignedBases     = align['rEnd'] - align ['rStart']
+                        alignedTotBases += alignedBases
+                        alignedMaxBases  = max (alignedBases, alignedMaxBases)
 
         # What follows is a series of increasingly restrictive
         # criteria for a useful subread. Keep track of the number of
@@ -143,8 +152,8 @@ def main ():
                             adaptC.longest (hole, maxSubreadLen)
 
                             if alignedSubreads > 0:
-                                alignC.incr (1, alignedSubreads, alignedBases)
-                                alignC.longest (hole, alignedBases)
+                                alignC.incr (1, alignedSubreads, alignedTotBases)     # total aligned bases
+                                alignC.longest (hole, alignedMaxBases)                # longest single alignment
 
     print
     print "file: ", basFilename
@@ -157,10 +166,10 @@ def main ():
     Counter.title();
 
     if cf is not None:                 # if we processed a .cmp.h5 file
-        for cntr in (totalC, seqC, prod0C, prod1C, HQLenC, HQScoreC, adaptC, alignC, prod2C):
+        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC, alignC):
             cntr.longPrint()
     else:
-        for cntr in (totalC, seqC, prod0C, prod1C, HQLenC, HQScoreC, adaptC, prod2C):
+        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC):
             cntr.longPrint()
     print
 
