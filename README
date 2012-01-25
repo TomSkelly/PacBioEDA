@@ -25,31 +25,49 @@ How to install:
 ~~~~~~~~~~~~~~
 
 Installation is trivial: Just untar the tar file to a location of your
-choice. It will create a subdirectory called
-TomSkelly-PacBioEDA-<version> containing the scripts. (You'll probably
-want to create a link to that directory with a more meaningful name.)
-The only configuration further required is to tell the scripts where
-to find the supporting Python modules they require, as described in
-the next section.
+choice. At the Linux command line:
+
+   cd MyFavouriteDirectory
+   tar -xzvf TomSkelly-PacBioEDA-e1e8636.tar.gz
+
+(with e1e8636 replaced by the current github version id of the file
+you downloaded).
+
+That will create a subdirectory called TomSkelly-PacBioEDA-<version>
+containing the scripts. (You'll probably want to create a link to that
+directory with a more meaningful name.) The only further configuration
+required is to tell the scripts where to find the supporting Python
+modules they require, as described in the next section.
+
 
 How to run:
 ~~~~~~~~~~
 
 In theory, the scripts can be run directly from the command
 line. However, they need to be told where to find the relevant Python
-packages (my modules, plus numpy, matplotlib, h5py, etc). That can be
-done by permanently setting PATH, PYTHONPATH, and LD_LIBRARY_PATH in
-your shell profile, or by running the scripts via the run_pac shell
-script included here. The settings in run_pac are a subset of those in
-smrtanalysis/etc/setup.sh. You'll need to modify run_pac in a couple
-of places (indicated by comments) to point to your installation
-directories.
+packages (my modules, plus numpy, matplotlib, h5py, etc). You could do
+that by permanently setting the PATH, PYTHONPATH, and LD_LIBRARY_PATH
+environmant variables in your shell profile. But it's probably easier
+to run the scripts via the run_pac shell script included here. The
+settings in run_pac are a subset of those in
+smrtanalysis/etc/setup.sh. run_pac sets the appropriate environment
+variables, then invokes the python script you specify. You'll need to
+modify run_pac in a couple of places (indicated by comments) to point
+to your installation directories.
 
 Note that, in particular, the python executable itself (which the
 scripts find via $PATH) should be the one supplied in the smrtanalysis
 release (currently python 2.5). If you mix and match (even different
 installations of v2.5), you may see obscure errors having to do with
 UTF8 encodings. Use the run_pac script to get all this right.
+
+Start by trying "run_pac ScriptName.py --help" for each script to see
+what parameters and options it accepts.
+
+Then do something like:
+
+    run_pac PacBio_FindAdapt.py --nocol MyBasFile.bas.h5 6789
+
 
 
 Scripts:
@@ -65,12 +83,12 @@ restrictive subsets of subreads:
       Total contents of bas file
         Sequencing ZMWs
           Productivity-0 Sequencing ZMWs
+          Productivity-2 Sequencing ZMWs
           Productivity-1 Sequencing ZMWs
             Reads with HQ region length > threshold
               Reads with HQ score > threshold
                 Reads with average insert size > threshold (i.e., not adapter dimers)
                   Reads which aligned (if a .cmp.h5 file was supplied)
-          Productivity-2 Sequencing ZMWs
 
 All of the above except average insert size are criteria applied by
 the filtering step of secondary analysis.
