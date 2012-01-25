@@ -11,6 +11,11 @@
 # line. Optional command line parameters specify a 0-based inclusive
 # range of bases within the read.
 
+# By default, different colours are used to indicate bases in the HQ
+# region, and in regions called adapters by the analysis
+# software. Colouring can be turned off by command line option, since
+# finding the HQ region is a time-consuming process.
+
 import sys
 import optparse
 import H5BasFile
@@ -21,6 +26,10 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+COL_NOT_HQ = '#00e000'     # colour for non-HQ region
+COL_HQ     = '#408000'     # HQ region
+COL_ADAPT  = '#e000e0'     # adapter
+
 def main ():
 
     logger.debug("%s starting" % sys.argv[0])
@@ -29,9 +38,6 @@ def main ():
 
     basFilename = args[0]
     basfile = H5BasFile.BasFile (basFilename)
-
-    aln = SWAligner.Aligner()
-    aln.setRead (H5BasFile.ADAPTER)
 
     try:
         hole = int(args[1])
@@ -44,45 +50,56 @@ def main ():
 
     sequence = basfile.getSequence(hole, start, end)
 
+    aln = SWAligner.Aligner()
     aln.setRef (sequence)
-
-    score = aln.fillMatrix()
-
-    refString, readString = aln.alignmentStrings()
-
-    print "best alignment score: %d" % score
-    print refString
-    print readString
-    print
-
+    aln.setRead (H5BasFile.ADAPTER)
+    aln.fillMatrix()
     allScores = aln.allScores()
+
+    range = xrange(start,end)
+    title = "ZMW %d (%d to %d)" % (hole, start, end)
+
+    plt.suptitle(title, fontsize=14, fontweight='bold')
+
+    plt.plot (range, allScores, COL_NOT_HQ, zorder=1, label='non-HQ')
+
+    if not opt.nocol:           # finding HQ region takes a long time, so optionally turn it off
+
+        # There doesn't seem to be a way to separately specify a
+        # colour for each point in a plot. So we'll plot in one
+        # colour, then overlay subregions of that with another
+        # colour. Plot commands are rendered in increasing zorder.
+
+        HQStart, HQEnd = basfile.HQregion(hole)[2:4]
+        HQRange = xrange(HQStart, HQEnd)
+        HQScores = allScores[HQStart:HQEnd]
+
+        plt.plot (HQRange, HQScores, COL_HQ, zorder=2, label='HQ')
+
+        label = 'adapter';             # I will only say this once...
+
+        for region in basfile.holeRegions(hole):     # loop through the regions looking for adapters
+
+            regionType, regionStart, regionEnd = region[1:4]
+
+            if regionType == 0:        # an adapter?
+                regionRange = xrange(regionStart, regionEnd)
+                regionScores = allScores[regionStart:regionEnd]
+                plt.plot (regionRange, regionScores, COL_ADAPT, zorder=3, label=label)
+
+                label = '_nolegend_'   # don't generate multiple legend entries
+
+        plt.legend(loc='best', prop={'size':10})     # add a legend box to figure
+
+    plt.ylim (0, len(H5BasFile.ADAPTER))
 
     if opt.output is not None:
         outfile = opt.output
     else:
         outfile = "ZMW-%05d.png" % hole
-
-    graphScores (xrange(start,end), 
-                 allScores, 
-                 outfile,
-                 "ZMW %d (%d to %d)" % (hole, start, end),
-                 len(H5BasFile.ADAPTER))
+    plt.savefig (outfile)
 
     logger.debug("complete")
-
-def graphScores (range, scores, outfile, title=None, ymax=None):
-
-    fig = plt.figure()
-
-    if title != None:
-        fig.suptitle(title, fontsize=14, fontweight='bold')
-
-    ax = fig.add_subplot(1,1,1)
-    ax.plot (range, scores)
-    if ymax != None:
-        plt.ylim (0, ymax)
-
-    plt.savefig (outfile)
 
 def getParms ():                       # use default input sys.argv[1:]
 
@@ -90,7 +107,8 @@ def getParms ():                       # use default input sys.argv[1:]
 
     parser.add_option ('--start', type='int', help='0-based start offset of output into read (def: %default)')
     parser.add_option ('--end',   type='int', help='0-based end offset of output into read (def: all)')
-    parser.add_option ('--output',            help='Output file name (def: %default)')
+    parser.add_option ('--nocol', action='store_true', help='do not colour plot by region (faster!)')
+    parser.add_option ('--output',            help='output file name (def: ZMW-nnnnn.png)')
 
     parser.set_defaults (start=0,
                          end=None,
