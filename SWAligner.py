@@ -227,6 +227,9 @@ class Aligner (object):
     def peakPosits (self, scores=None, thresh1=None, thresh2=None):
         '''Return a list containing positions of peaks in a list of scores.'''
 
+        if not self._matrixValid:
+            raise RuntimeError("matrix has not been computed.")
+
         # A contiguous run of scores > thresh1 defines a 'range'. In
         # each range, report the highest score as the peak. Don't
         # start a new range until scores drop below thresh2, to avoid
