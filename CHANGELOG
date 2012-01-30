@@ -1,0 +1,15 @@
+
+New script PacBio_FullInsert.py plots histogram of sizes of full
+molecule sub-reads only, excluding partial sub-reads at start and end
+of read.
+
+New script PacBio_Qual.py prints detailed basecall quality scores for
+one ZMW.
+
+PacBio_FindAdapt.py now plots HQ regions and adapters in colour.
+
+In PacBio_BasSummary.py, on the 'Aligned' line, the total bases column
+reports all aligned bases, but the max column reports the length of
+the single longest alignment.
+
+Fixed exception in PacBio_Bas.py when the subread contains no errors.
