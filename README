@@ -114,14 +114,18 @@ this script, do "run_pac PacBio_Bas.py --linehelp".
 * PacBio_BasFilteredSubreads.py:
 
 Python script to extract filtered subreads from a bas.h5 file, and
-write them to a fasta file. By default, it will reproduce the
-sec/data/filtered_subreads.fasta file for the set described by the
-input .bas.h5 file. Different filtering parameters can be specified
-as command line parameters.
+write them to a fasta (or, optionally, fastq) file. By default, it
+will reproduce the sec/data/filtered_subreads.fasta file for the set
+described by the input .bas.h5 file. Different filtering parameters
+can be specified as command line parameters.
 
 The main reason for the existence of this script is to convince
 myself that I understand how filtering works. But it also provides a
 quick way to extract a set of reads from a .bas.h5 file.
+
+The option to produce a fastq file is not easily available elsewhere
+(as of SMRTanalysis 1.2.3). It uses the QualityValue field from the
+bas.h5 data, and ascii-encodes it as Q+33.
 
 
 * PacBio_HQ.py

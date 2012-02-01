@@ -6,6 +6,10 @@ of read.
 New script PacBio_Qual.py prints detailed basecall quality scores for
 one ZMW.
 
+PacBio_BasFilteredSubreads.py now has option to output sequence and
+quality data from bas.h5 file, using the QualityValue field,
+ascii-encoded as Q+33.
+
 PacBio_FindAdapt.py now plots HQ regions and adapters in colour.
 
 In PacBio_BasSummary.py, add a 'avg' column which shows average
