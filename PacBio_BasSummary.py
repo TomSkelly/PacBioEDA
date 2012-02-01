@@ -192,6 +192,7 @@ def getParms ():                       # use default input sys.argv[1:]
     return opt, args
 
 class Counter (object):
+    '''Collect and print summary statistics from bas.h5 reads.'''
 
     def __init__ (self, name):
 
@@ -203,12 +204,14 @@ class Counter (object):
         self._maxLen      = 0          # WARNING: assumes value >= 0
 
     def incr (self, reads, regions, bases):
+        '''Increment the count of reads, subreads, and bases.'''
 
         self._numReads    += reads
         self._numSubreads += regions
         self._numBases    += bases
 
     def longest (self, which, value):
+        '''Given a read/subread length, save it away if it is the longest we've seen do far.'''
 
         if value > self._maxLen:
             self._maxLen   = value
@@ -217,13 +220,15 @@ class Counter (object):
     @staticmethod
     def title ():
 
-        print "reads subreads      bases     max    ZMW  criterion"
+        print "reads subreads      bases    avg     max    ZMW  criterion"
         print
 
     def longPrint (self):
 
-        print "%5d  %7d  %9d  %6d  %5d  %s" \
-            % (self._numReads, self._numSubreads, self._numBases, self._maxLen, self._whichZMW, self._name)
+        avgLen = self._numBases / self._numSubreads if self._numSubreads > 0 else 0
+
+        print "%5d  %7d  %9d  %5d  %6d  %5d  %s" \
+            % (self._numReads, self._numSubreads, self._numBases, avgLen, self._maxLen, self._whichZMW, self._name)
 
 if __name__ == "__main__":
     main()
