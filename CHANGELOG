@@ -8,8 +8,11 @@ one ZMW.
 
 PacBio_FindAdapt.py now plots HQ regions and adapters in colour.
 
-In PacBio_BasSummary.py, on the 'Aligned' line, the total bases column
-reports all aligned bases, but the max column reports the length of
-the single longest alignment.
+In PacBio_BasSummary.py, add a 'avg' column which shows average
+subread length (i.e., bases/subreads).
+
+Also in PacBio_BasSummary.py, on the 'Aligned' line, the total bases
+column reports all aligned bases, but the max column now reports the
+length of the single longest alignment.
 
 Fixed exception in PacBio_Bas.py when the subread contains no errors.

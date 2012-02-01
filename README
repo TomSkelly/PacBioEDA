@@ -124,24 +124,6 @@ myself that I understand how filtering works. But it also provides a
 quick way to extract a set of reads from a .bas.h5 file.
 
 
-* PacBio_FindAdapt.py:
-
-Read a PacBio bas.h5 file, extract the sequence for a ZMW specified
-on the command line, align it to the adapter sequence, and output a
-plot of Smith-Waterman alignment scores at each position in the
-read. By default, output is to file ZMW-zzzzz.png, where zzzzz is
-the zero-padded ZMW number -- this can be overridden on the command
-line. Optional command line parameters specify a 0-based inclusive
-range of bases within the read.
-
-
-* PacBio_Show.py:
-
-Read a PacBio bas.h5 file, print a range of sequence from a specified
-ZMW in fasta format. Command line parameters are bas.h5 file name and
-ZMW#. Options include 0-based start and stop offsets.
-
-
 * PacBio_HQ.py
 
 Plot the number of ZMWs in pre-HQ, HQ, and post-HQ status as a
@@ -165,6 +147,32 @@ line parameter, defaulting to XY.png.
 Create a plot of ZMW productivity by x/y position on the
 SMRTcell. First parameter is input .bas.h5 file. Output png file is
 optional command line parameter, defaulting to productivity.png.
+
+
+* PacBio_FindAdapt.py:
+
+Read a PacBio bas.h5 file, extract the sequence for a ZMW specified
+on the command line, align it to the adapter sequence, and output a
+plot of Smith-Waterman alignment scores at each position in the
+read. By default, output is to file ZMW-zzzzz.png, where zzzzz is
+the zero-padded ZMW number -- this can be overridden on the command
+line. Optional command line parameters specify a 0-based inclusive
+range of bases within the read.
+
+
+* PacBio_FullInsert.py:
+
+Read a PacBio bas.h5 file, find 'full' insert regions, and produce a
+histogram of their lengths. Full inserts are insert regions which
+cover the entire sequenced milecule. I.e., inserts which run from one
+adapter to the other.
+
+
+* PacBio_Show.py:
+
+Read a PacBio bas.h5 file, print a range of sequence from a specified
+ZMW in fasta format. Command line parameters are bas.h5 file name and
+ZMW#. Options include 0-based start and stop offsets.
 
 
 * PacBio_Dump.py:
