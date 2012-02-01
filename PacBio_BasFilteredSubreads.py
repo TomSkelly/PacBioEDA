@@ -4,24 +4,32 @@
 # of module.
 
 # Python script to extract filtered subreads from a bas.h5 file, and
-# write them to a fasta file. By default, it will reproduce the
-# sec/data/filtered_subreads.fasta file for the set described by the
-# input .bas.h5 file. Different filtering parameters can be specified
-# as command line parameters.
+# write them to a fasta (or, optionally, fastq) file. By default, it
+# will reproduce the sec/data/filtered_subreads.fasta file for the set
+# described by the input .bas.h5 file. Different filtering parameters
+# can be specified as command line parameters.
 
 # The main reason for the existence of this script is to convince
 # myself that I understand how filtering works. But it also provides a
 # quick way to extract a set of reads from a .bas.h5 file.
+
+# The option to produce a fastq file is not easily available elsewhere
+# (as of SMRTanalysis 1.2.3). It uses the QualityValue field from the
+# bas.h5 data, and ascii-encodes it as Q+33.
 
 import sys
 import optparse
 import H5BasFile
 from tt_log import logger
 
+# Defaults for command line options:
+
 DEF_SCORE_THRESHOLD  = 750
 DEF_HQ_LENGTH        = 50
-DEF_INSERT_THRESHOLD = 100
+DEF_INSERT_THRESHOLD = 1          # default = no threshold, as done by primary analysis
 DEF_FASTA_LEN        = 50
+
+PHRED_SCALER = 33
 
 def main ():
 
@@ -57,12 +65,15 @@ def main ():
                                 start = max(HQStart, regionStart)
                                 end   = min(HQEnd,   regionEnd)
 
-                                if start < end:
+                                if end - start >= opt.insert:
 
-                                    printFasta (bf, hole, start, end, opt.flen)
+                                    if opt.fastq:
+                                        printFastq (bf, hole, start, end)
+                                    else:
+                                        printFasta (bf, hole, start, end, opt.flen)
+
                                     numReads += 1
                                     numBases += end-start
-
 
     logger.debug("wrote %d reads, %d bases" % (numReads, numBases))
     logger.debug("complete")
@@ -92,14 +103,30 @@ def printFasta (bf, hole, start, end, flen):
     for ix in xrange(0,len(sequence),flen):
         print sequence[ix:ix+flen]
 
+def printFastq (bf, hole, start, end):
+    '''Print sequence and qualities in fastq format.'''
+
+    movie = bf.movieName()
+    print "@%s/%d/%d_%d" % (movie, hole, start, end)
+
+    sequence = bf.getSequence(hole, start, end)
+    print sequence
+    print '+'
+
+    qualities = bf.getBasecallField("QualityValue", hole, start, end)
+    phredQuals = ''.join(chr(Q+PHRED_SCALER) for Q in qualities)
+    print phredQuals
+
 def getParms ():                       # use default input sys.argv[1:]
 
-    parser = optparse.OptionParser(usage='%prog [options] <bas_file>')
+    parser = optparse.OptionParser(usage='%prog [options] <bas_file>',
+                                   description='Output filtered subreads in fasta or fastq format.')
 
     parser.add_option ('--score',     type='int', help='Minimum HQ region score (def: %default)')
     parser.add_option ('--length',    type='int', help='Minimum HQ region length (def: %default)')
-    parser.add_option ('--insert',    type='int', help='Minimum average insert length (def: %default)')
-    parser.add_option ('--fasta-len', type='int', help='Number of bases in output fasta line (def: %default)',
+    parser.add_option ('--insert',    type='int', help='Minimum insert length (def: %default)')
+    parser.add_option ('--fastq',     action='store_true', help='Output data as fastq file (def: fasta)')
+    parser.add_option ('--fasta-len',  type='int', help='Number of bases in output fasta line (def: %default)',
                                       dest='flen')
 
     parser.set_defaults (score=DEF_SCORE_THRESHOLD,
@@ -114,7 +141,7 @@ def getParms ():                       # use default input sys.argv[1:]
 if __name__ == "__main__":
     main()
 
-# Copyright (C) 2011 Genome Research Limited
+# Copyright (C) 2012 Genome Research Limited
 #
 # This library is free software. You can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
