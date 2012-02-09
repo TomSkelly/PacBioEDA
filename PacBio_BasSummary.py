@@ -104,7 +104,7 @@ def main ():
                 cumSubreadLen += max (end-start, 0)   # clip negative lengths to zero
 
                 if cf is not None:
-                    align = cf.getAlignmentAsDict (hole, start, end) # alignment record for this region
+                    align = cf.getAlignmentByPosition (hole, start, end) # alignment record for this region
 
                     if align is not None:                            # if the region aligned
                         alignedSubreads += 1
@@ -177,7 +177,8 @@ def main ():
 
 def getParms ():                       # use default input sys.argv[1:]
 
-    parser = optparse.OptionParser(usage='%prog [options] <bas_file> [<cmp_file>]')
+    parser = optparse.OptionParser(usage='%prog [options] <bas_file> [<cmp_file>]',
+                                   description='Print (to stdout) summary information about the contents of a bas.h5 file.')
 
     parser.add_option ('--score',  type='int', help='Minimum HQ region score (def: %default)')
     parser.add_option ('--length', type='int', help='Minimum HQ region length (def: %default)')

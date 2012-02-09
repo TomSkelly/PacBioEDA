@@ -102,7 +102,7 @@ def main ():
 
                 align = None
                 if cf != None:
-                    align = cf.getAlignmentAsDict (hole, start, end) # alignment record for this region
+                    align = cf.getAlignmentByPosition (hole, start, end) # alignment record for this region
 
                 if align != None:                              # if the region aligned
 
