@@ -1,9 +1,29 @@
 #!/usr/bin/env python
 
+# Copyright (C) 2012 Genome Research Limited -- See full notice at end
+# of module.
+
 # Package for accessing data from PacBio cmp.h5 alignment files.
 
-# Copyright (C) 2011 Genome Research Limited -- See full notice at end
-# of module.
+# A bit of design philosophy: The front door to a cmp file is the
+# /AlnInfo/AlnIndex dataset. It contains one row for each aligned
+# sub-read. Each row includes 22 columns as shown below. Since a cmp
+# file can be sorted in several ways, no assumptions can be made about
+# the order of the entries.
+
+# So how should this module provide user access to AlnIndex data? We
+# could implement that as a two-step interface, where the user must
+# first determine the indexes of the entries of interest, then request
+# the data for each of those entries. However, having determined an
+# index, the user's next action will almost certainly be to request
+# the data for it. So here we combine the two steps: this module's
+# methods for accessing AlnIndex return the data itself, rather than
+# an index to it. This eliminates the need for the user to know about
+# entry indexes at all.
+
+# There are several such access methods, mostly implemented as
+# generator functions. See the doc strings for getAllAlignments,
+# getAlignmentsByHole, getAlignmentsForHole and getAlignmentByPosition.
 
 # From /AlnInfo/AlnIndex annotations (in early versions of cmp.h5 files):
 
@@ -72,16 +92,84 @@ class CmpFile (object):
         self._index        = self._top['AlnInfo/AlnIndex']
         self._subreadMap   = None
 
-        if maxHole == None:
+        if maxHole is None:
             self._maxHole = max(self._index[:,7])     # largest *mapped* hole (for any set), may not be max hole!
         else:
             self._maxHole = maxHole
 
+        self._refPath = list(self._top['RefGroup/Path'])   # make a copy: we're going to modify it
+        self._refPath.insert (0, None)                     # RefSeqId is 1-based index: add dummy entry 0
+
+        # Should we call getSubreadMap at this point? It's fairly
+        # time-consuming. Let's put it off until it's actually needed.
+
     def __del__ (self):
         self._infile.close()
 
-    def index (self):
-        return self._index
+    def getAlignmentAsDict (self, ix):      # access to AlnIndex info, given an ix
+        '''Return info for the specified alignment as a dict.'''
+
+        if ix is None:
+            return None
+
+        index = self._index
+
+        return dict(zip(INDEX_COLS, index[ix,:]))
+
+    def getAllAlignments (self):
+        '''Generator function to return all indexes, in whatever order the file is sorted in.'''
+
+        ishape = self._index.shape
+
+        for ix in xrange(ishape[0]):
+            yield self.getAlignmentAsDict (ix)
+
+    def getAlignmentsByHole (self):
+        '''Generator function to return all alignments, sorted by hole/read position.'''
+
+        map   = self.getSubreadMap()
+        index = self._index
+
+        for hole in xrange(self._maxHole):
+
+            # We could call getAlignmentsForHole here, but quicker to
+            # do the business right here, rather than invoke a method.
+
+            if map[hole] != None:
+
+                for ix in sorted(map[hole], key=lambda n: index[n,11]):    # col 11 is rStart
+                    yield self.getAlignmentAsDict (ix)
+
+        return
+
+    def getAlignmentsForHole (self, hole):
+        '''Generator function to return alignments for a hole, in order as they appear in the read.'''
+
+        map = self.getSubreadMap()
+
+        if map[hole] != None:
+
+            index = self._index
+
+            for ix in sorted(map[hole], key=lambda n: index[n,11]):    # col 11 is rStart
+                yield self.getAlignmentAsDict (ix)
+
+        return
+
+    def getAlignmentByPosition (self, hole, start, end):
+        '''Return the alignment which falls within start-end for specified hole.'''
+
+        map = self.getSubreadMap()
+
+        if map[hole] != None:
+
+            index = self._index
+
+            for ix in map[hole]:            # find the alignment record for this region
+                if index[ix,11] >= start and index[ix,12] <= end:
+                    return self.getAlignmentAsDict (ix)     # return: this is NOT a generator function
+
+        return None
 
     def getSubreadMap (self):
         '''Create and cache a lookup table which maps a ZMW number to its mapped subreads'''
@@ -121,34 +209,8 @@ class CmpFile (object):
 
         return self._subreadMap
 
-    def getAlignmentIndex (self, hole, start, end):
-        '''Return the index of the alignment which falls within start-end for specified hole.'''
 
-        map = self.getSubreadMap()
-
-        if map[hole] != None:
-
-            index = self._index
-
-            for ix in map[hole]:            # find the alignment record for this region
-                if index[ix,11] >= start and index[ix,12] <= end:
-                    return ix
-
-        return None
-
-    def getAlignmentAsDict (self, hole, start, end):
-        '''Return info for the specified alignment as a dict.'''
-
-        ix = self.getAlignmentIndex (hole, start, end)
-
-        if ix is None:
-            return None
-
-        index = self._index
-
-        return dict(zip(INDEX_COLS, index[ix,:]))
-
-# Copyright (C) 2011 Genome Research Limited
+# Copyright (C) 2012 Genome Research Limited
 #
 # This library is free software. You can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
