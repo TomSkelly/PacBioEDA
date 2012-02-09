@@ -79,18 +79,18 @@ INDEX_COLS = ('AlignmentId',
 
 class CmpFile (object):
 
-    def __init__ (self, filename, set=1, strobe=0, maxHole=None):
+    def __init__ (self, fileName, movieName, maxHole=None):
 
-        logger.debug("creating CmpFile object for set %d strobe %d" % (set, strobe))
+        logger.debug("creating CmpFile object for %s" % (movieName))
 
-        self._filename     = filename
-        self._setNumber    = set
-        self._strobeNumber = strobe
+        self._fileName     = fileName
+        self._movieName    = movieName
 
-        self._infile       = h5py.File (filename, 'r')
+        self._infile       = h5py.File (fileName, 'r')
         self._top          = h5py.Group (self._infile, '/')
         self._index        = self._top['AlnInfo/AlnIndex']
         self._subreadMap   = None
+        self._readGroups   = None
 
         if maxHole is None:
             self._maxHole = max(self._index[:,7])     # largest *mapped* hole (for any set), may not be max hole!
@@ -180,22 +180,22 @@ class CmpFile (object):
         # lists containing indexes into AlnInfo/AlnIndex for all
         # subreads for the ZMW.
 
-        if self._subreadMap == None:
+        if self._subreadMap is None:
 
             logger.debug("creating subread map")
             
             ishape = self._index.shape
             self._subreadMap = [None] * (self._maxHole+1)
 
-            set    = self._setNumber
-            strobe = self._strobeNumber
+            readGroups = self.getReadGroups()       # set of read group IDs for this movie
+
             kept   = 0
 
             for ix in xrange(ishape[0]):
 
                 # TODO: create multi-level index for all sets/strobes in one go
 
-                if self._index[ix,8] == set and self._index[ix,9] == strobe:
+                if self._index[ix,1] in readGroups:
 
                     kept += 1
 
@@ -205,9 +205,30 @@ class CmpFile (object):
                     else:
                         self._subreadMap[hole].append(ix)
 
-            logger.debug("processed %d entries, kept %d" % (ishape[0], kept))
+            logger.debug("kept %d of %d subread entries for this movie" % (kept, ishape[0]))
 
         return self._subreadMap
+
+    def getReadGroups (self):
+        '''Find read groups in /AlnGroup/Path for this movie.'''
+
+        if self._readGroups is None:
+
+            logger.debug("creating ReadGroup list")
+
+            self._readGroups = set()
+
+            movie = self._movieName
+            path  = self._top['AlnGroup/Path']
+            ID  = self._top['AlnGroup/ID']
+
+            for ix in xrange(len(path)):
+                if path[ix].endswith(movie):
+                    self._readGroups.add(ID[ix])
+                    
+            logger.debug("kept %d of %d ReadGroups for this movie" % (len(self._readGroups), len(path)))
+
+        return self._readGroups
 
 
 # Copyright (C) 2012 Genome Research Limited

@@ -45,9 +45,8 @@ def main ():
         
         cmpFilename = args[1]
         logger.debug("cmp file: %s" % cmpFilename)
-        cf = H5CmpFile.CmpFile (cmpFilename,
-                                set=bf.setNumber(), 
-                                strobe=bf.strobeNumber(),
+        cf = H5CmpFile.CmpFile (fileName=cmpFilename, 
+                                movieName=bf.movieName(),
                                 maxHole=bf.numZMWs())
 
     aln = SWAligner.Aligner()           # we'll use this in the loop below for finding adapters
