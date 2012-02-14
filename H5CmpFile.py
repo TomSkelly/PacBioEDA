@@ -25,6 +25,24 @@
 # generator functions. See the doc strings for getAllAlignments,
 # getAlignmentsByHole, getAlignmentsForHole and getAlignmentByPosition.
 
+# The cmp file also contains numerous groups with names like
+# /refnnnnn/<moviename>. That's where the basecall-level information
+# resides. The mapping from an alignment entry's ReadGroupId to the
+# basecall group is via /AlnGroup/Path. The getReadGroups method
+# manages that mapping.
+
+# NOTE that as of Feb 2012 the interface to the cmp file provided by
+# this module has changed. Remember that a cmp file can contain
+# alignments for many movies. Prior to the change, a CmpFile object
+# could access data from only one movie. In most cases, that was quite
+# adequate since, in most cases, the cmp file is being accessed in
+# combination with a bas.h5 basecall file, which contains data for one
+# movie only. However, it is possible that a user would like to access
+# data from multiple movies. So we now provide a double-barrelled
+# interface which defines file and movie objects. We've added more
+# general functionality, at the cost of increased complexity both here
+# and for the user.
+
 # From /AlnInfo/AlnIndex annotations (in early versions of cmp.h5 files):
 
 #    ColName00 = AlignmentId
@@ -77,17 +95,52 @@ INDEX_COLS = ('AlignmentId',
               'nBackRead',
               'nReadOverlap')
 
+BASE_MAP = ('-',  'A',  'C', None,
+            'G', None, None, None,
+            'T', None, None, None,
+            None, None, None, 'N',
+            )
+
 class CmpFile (object):
 
-    def __init__ (self, fileName, movieName, maxHole=None):
+    def __init__ (self, fileName):
 
-        logger.debug("creating CmpFile object for %s" % (movieName))
+        logger.debug("creating CmpFile object for %s" % (fileName))
 
-        self._fileName     = fileName
+        self._fileName = fileName
+        self._infile   = h5py.File (fileName, 'r')
+        self._top      = h5py.Group (self._infile, '/')
+
+        return
+
+    def __del__ (self):
+        self._infile.close()
+
+    def top (self):
+        return self._top
+
+    def movieList (self):
+        '''Generator function to return the list of movie names included in the cmp file.'''
+
+        list = self._top['MovieInfo/Name']
+        for movie in list:
+            yield movie
+
+        return
+
+    # It's not clear that any other methods of CmpFile would be
+    # useful. We could do a ReadGroup-to-MovieName method. But if the
+    # user knows the ReadGroup, he presumably already knows the
+    # MovieName -- that's how he got there.
+
+class CmpMovie (object):
+
+    def __init__ (self, cmpObject, movieName, maxHole=None):
+
+        logger.debug("creating CmpMovie object for %s" % (movieName))
+
         self._movieName    = movieName
-
-        self._infile       = h5py.File (fileName, 'r')
-        self._top          = h5py.Group (self._infile, '/')
+        self._top          = cmpObject.top()
         self._index        = self._top['AlnInfo/AlnIndex']
         self._subreadMap   = None
         self._readGroups   = None
@@ -97,14 +150,11 @@ class CmpFile (object):
         else:
             self._maxHole = maxHole
 
-        self._refPath = list(self._top['RefGroup/Path'])   # make a copy: we're going to modify it
-        self._refPath.insert (0, None)                     # RefSeqId is 1-based index: add dummy entry 0
-
         # Should we call getSubreadMap at this point? It's fairly
         # time-consuming. Let's put it off until it's actually needed.
 
-    def __del__ (self):
-        self._infile.close()
+        return
+
 
     def getAlignmentAsDict (self, ix):      # access to AlnIndex info, given an ix
         '''Return info for the specified alignment as a dict.'''
@@ -147,7 +197,7 @@ class CmpFile (object):
 
         map = self.getSubreadMap()
 
-        if map[hole] != None:
+        if hole <= self._maxHole and map[hole] is not None:
 
             index = self._index
 
@@ -161,7 +211,7 @@ class CmpFile (object):
 
         map = self.getSubreadMap()
 
-        if map[hole] != None:
+        if hole <= self._maxHole and map[hole] is not None:
 
             index = self._index
 
@@ -170,6 +220,22 @@ class CmpFile (object):
                     return self.getAlignmentAsDict (ix)     # return: this is NOT a generator function
 
         return None
+
+    def getAlignmentStrings (self, align):      # 'align' is an alignment dict
+        '''Return read and reference aligments strings from specified alignment.'''
+
+        readGroups = self.getReadGroups()       # list of /refnnnnn/<moviename> groups, indexed by ReadGroupId
+        RG         = align['ReadGroupId']
+        alnArray   = readGroups[RG]['AlnArray']
+
+        refString  = []
+        readString = []
+
+        for bases in alnArray[align['offset_begin']:align['offset_end']]:
+            refString.append(BASE_MAP[bases & 0x0f])
+            readString.append(BASE_MAP[bases>>4])
+
+        return (''.join(refString), ''.join(readString))
 
     def getSubreadMap (self):
         '''Create and cache a lookup table which maps a ZMW number to its mapped subreads'''
@@ -216,15 +282,15 @@ class CmpFile (object):
 
             logger.debug("creating ReadGroup list")
 
-            self._readGroups = set()
+            self._readGroups = dict()
 
             movie = self._movieName
             path  = self._top['AlnGroup/Path']
-            ID  = self._top['AlnGroup/ID']
+            ID    = self._top['AlnGroup/ID']
 
             for ix in xrange(len(path)):
                 if path[ix].endswith(movie):
-                    self._readGroups.add(ID[ix])
+                    self._readGroups[ID[ix]] = self._top[path[ix]]
                     
             logger.debug("kept %d of %d ReadGroups for this movie" % (len(self._readGroups), len(path)))
 
