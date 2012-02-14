@@ -69,6 +69,14 @@ Then do something like:
     run_pac PacBio_FindAdapt.py --nocol MyBasFile.bas.h5 6789
 
 
+A note about offsets:
+~~~~~~~~~~~~~~~~~~~~
+
+Offsets printed are zero-based. The only exception to that is
+alignment coordinates against a reference genome. Start-stop intervals
+are printed python-style: The interval 0-10 is ten bases long, and its
+last base is offset 9.
+
 
 Scripts:
 ~~~~~~~
