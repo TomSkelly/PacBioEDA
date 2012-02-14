@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2011 Genome Research Limited -- See full notice at end
+# Copyright (C) 2012 Genome Research Limited -- See full notice at end
 # of module.
 
 # Python script to extract filtered subreads from a bas.h5 file, and
@@ -120,13 +120,13 @@ def printFastq (bf, hole, start, end):
 def getParms ():                       # use default input sys.argv[1:]
 
     parser = optparse.OptionParser(usage='%prog [options] <bas_file>',
-                                   description='Output filtered subreads in fasta or fastq format.')
+                                   description='Output (to stdout) filtered subreads in fasta or fastq format.')
 
     parser.add_option ('--score',     type='int', help='Minimum HQ region score (def: %default)')
     parser.add_option ('--length',    type='int', help='Minimum HQ region length (def: %default)')
     parser.add_option ('--insert',    type='int', help='Minimum insert length (def: %default)')
     parser.add_option ('--fastq',     action='store_true', help='Output data as fastq file (def: fasta)')
-    parser.add_option ('--fasta-len',  type='int', help='Number of bases in output fasta line (def: %default)',
+    parser.add_option ('--fasta-len', type='int', help='Number of bases in output fasta line (def: %default)',
                                       dest='flen')
 
     parser.set_defaults (score=DEF_SCORE_THRESHOLD,
