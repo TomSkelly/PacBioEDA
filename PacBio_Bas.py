@@ -39,15 +39,16 @@ def main ():
     logger.debug("bas file: %s" % basFilename)
     bf = H5BasFile.BasFile (basFilename)
 
-    cf = None                      # no cmp file?
+    cmp = None                      # no cmp file?
 
     if len(args) > 1:
         
         cmpFilename = args[1]
         logger.debug("cmp file: %s" % cmpFilename)
-        cf = H5CmpFile.CmpFile (fileName=cmpFilename, 
-                                movieName=bf.movieName(),
-                                maxHole=bf.numZMWs())
+        cf  = H5CmpFile.CmpFile (fileName=cmpFilename)
+        cmp = H5CmpFile.CmpMovie (cmpObject=cf,
+                                  movieName=bf.movieName(),
+                                  maxHole=bf.numZMWs())
 
     aln = SWAligner.Aligner()           # we'll use this in the loop below for finding adapters
     aln.setRead (H5BasFile.ADAPTER)     # adapter sequence is query
@@ -100,8 +101,8 @@ def main ():
                 insSize = end - start
 
                 align = None
-                if cf != None:
-                    align = cf.getAlignmentByPosition (hole, start, end) # alignment record for this region
+                if cmp is not None:
+                    align = cmp.getAlignmentByPosition (hole, start, end) # alignment record for this region
 
                 if align != None:                              # if the region aligned
 

@@ -33,39 +33,39 @@ def main ():
 
     cmpFilename = args[1]
     logger.debug("cmp file: %s" % cmpFilename)
-    cf = H5CmpFile.CmpFile (cmpFilename,
-                            set=bf.setNumber(), 
-                            strobe=bf.strobeNumber(),
-                            maxHole=bf.numZMWs())
+    cf  = H5CmpFile.CmpFile (fileName=cmpFilename)
+    cmp = H5CmpFile.CmpMovie (cmpObject=cf,
+                              movieName=bf.movieName(),
+                              maxHole=bf.numZMWs())
 
     print "AlnID  RG   Hole Set Stb  SubRd      Start        End Ref St RefStrt  RefEnd   OffStrt    OffEnd"
     print
 
     if opt.sort == 'hole':
 
-        for align in cf.getAlignmentsByHole():
+        for align in cmp.getAlignmentsByHole():
             printAlign(align)
 
     else :                                                    # must be 'none' 
 
-        for align in cf.getAllAlignments():                   # generator function, returns a dict
+        for align in cmp.getAllAlignments():                   # generator function, returns a dict
             printAlign(align)
 
     logger.debug("complete")
 
 def printAlign (align):
 
-    print "%5d  %2d  %5d  %2d  %2d  %5d  %9d  %9d  %2d  %1d  %6d  %6d  %8d  %8d   %5d  %5d" \
+    print "%5d  %2d  %5d  %2d  %2d  %5d  %2d  %1d  %9d  %9d  %6d  %6d  %8d  %8d   %5d  %5d" \
         % (align['AlignmentId'],
            align['ReadGroupId'],
            align['HoleNumber'],
            align['SetNumber'],
            align['StrobeNumber'],
            align['SubreadId'],
-           align['tStart'],
-           align['tEnd'],
            align['RefSeqId'],
            align['RCRefStrand'],
+           align['tStart'],
+           align['tEnd'],
            align['rStart'],
            align['rEnd'],
            align['offset_begin'],

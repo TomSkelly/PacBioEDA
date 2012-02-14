@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2011 Genome Research Limited -- See full notice at end
+# Copyright (C) 2012 Genome Research Limited -- See full notice at end
 # of module.
 
 # Python script to print summary information about the contents of a
@@ -52,15 +52,16 @@ def main ():
     logger.debug("bas file: %s" % basFilename)
     bf = H5BasFile.BasFile (basFilename)
 
-    cf = None                      # no cmp file?
+    cmp = None                      # no cmp file?
 
     if len(args) > 1:
         
         cmpFilename = args[1]
         logger.debug("cmp file: %s" % cmpFilename)
-        cf = H5CmpFile.CmpFile (fileName=cmpFilename, 
-                                movieName=bf.movieName(),
-                                maxHole=bf.numZMWs())
+        cf  = H5CmpFile.CmpFile (fileName=cmpFilename)
+        cmp = H5CmpFile.CmpMovie (cmpObject=cf,
+                                  movieName=bf.movieName(),
+                                  maxHole=bf.numZMWs())
 
     totalC   = Counter('Total')
     seqC     = Counter('--Sequencing')
@@ -102,8 +103,8 @@ def main ():
                 maxSubreadLen  = max (end-start, maxSubreadLen)
                 cumSubreadLen += max (end-start, 0)   # clip negative lengths to zero
 
-                if cf is not None:
-                    align = cf.getAlignmentByPosition (hole, start, end) # alignment record for this region
+                if cmp is not None:
+                    align = cmp.getAlignmentByPosition (hole, start, end) # alignment record for this region
 
                     if align is not None:                            # if the region aligned
                         alignedSubreads += 1
@@ -164,7 +165,7 @@ def main ():
 
     Counter.title();
 
-    if cf is not None:                 # if we processed a .cmp.h5 file
+    if cmp is not None:                 # if we processed a .cmp.h5 file
         for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC, alignC):
             cntr.longPrint()
     else:
@@ -233,7 +234,7 @@ class Counter (object):
 if __name__ == "__main__":
     main()
 
-# Copyright (C) 2011 Genome Research Limited
+# Copyright (C) 2012 Genome Research Limited
 #
 # This library is free software. You can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
