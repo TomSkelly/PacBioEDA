@@ -165,6 +165,9 @@ class CmpMovie (object):
         return
 
 
+    def movieName (self):
+        return self._movieName
+
     def getAlignmentAsDict (self, ix):      # access to AlnIndex info, given an ix
         '''Return info for the specified alignment as a dict.'''
 
