@@ -47,7 +47,7 @@ In theory, the scripts can be run directly from the command
 line. However, they need to be told where to find the relevant Python
 packages (my modules, plus numpy, matplotlib, h5py, etc). You could do
 that by permanently setting the PATH, PYTHONPATH, and LD_LIBRARY_PATH
-environmant variables in your shell profile. But it's probably easier
+environment variables in your shell profile. But it's probably easier
 to run the scripts via the run_pac shell script included here. The
 settings in run_pac are a subset of those in
 smrtanalysis/etc/setup.sh. run_pac sets the appropriate environment
@@ -57,9 +57,10 @@ to your installation directories.
 
 Note that, in particular, the python executable itself (which the
 scripts find via $PATH) should be the one supplied in the smrtanalysis
-release (currently python 2.5). If you mix and match (even different
-installations of v2.5), you may see obscure errors having to do with
-UTF8 encodings. Use the run_pac script to get all this right.
+release (currently python 2.5, moving to 2.7 in PacBio release
+1.3.0). If you mix and match (even different installations of v2.5),
+you may see obscure errors having to do with UTF8 encodings. Use the
+run_pac script to get all this right.
 
 Start by trying "run_pac ScriptName.py --help" for each script to see
 what parameters and options it accepts.

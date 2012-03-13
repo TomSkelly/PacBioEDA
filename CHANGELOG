@@ -1,4 +1,28 @@
 
+2012-03-13:
+~~~~~~~~~~
+
+Fixed bug in H5CmpFile.py which produced incorrect reference contif
+numbers.
+
+
+2012-02-14:
+~~~~~~~~~~
+
+run_pac uses python 2.7 if running SMRTanalysis 1.3.0.
+
+New interface to H5CmpFile.py: Separate file and movie objects.
+
+New script to print alignment strings from cmp file: PacBio_ShowAlignments.py
+
+New script to print alignment details from cmp file: PacBio_CmpDetails.py
+
+Optionally output data in fastq format from PacBio_BasFilteredSubreads.py
+
+
+2012-02-01:
+~~~~~~~~~~
+
 New script PacBio_FullInsert.py plots histogram of sizes of full
 molecule sub-reads only, excluding partial sub-reads at start and end
 of read.
