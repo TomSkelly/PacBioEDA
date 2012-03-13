@@ -49,41 +49,54 @@ def main ():
                               movieName=movie,
                               maxHole=bf.numZMWs())
 
-    for align in cmp.getAlignmentsByHole():
+    if opt.ZMW is not None:                      # did we ask for a specific ZMW?
 
-        hole   = align['HoleNumber']
-        rStart = align['rStart']
-        rEnd   = align['rEnd']
+        for align in cmp.getAlignmentsForHole(opt.ZMW):
 
-        readName = "%s/%d/%d_%d" % (movie, hole, rStart, rEnd);
+            printAlignment (align, cmp, opt.flen)
 
-        print readName
-        print
+    else:                                        # else, print all ZMWs
 
-        refString, readString = cmp.getAlignmentStrings (align)
+        for align in cmp.getAlignmentsByHole():
 
-        flen = opt.flen
-        refDashes  = 0
-        readDashes = 0
-
-        for ix in xrange(0,len(refString),flen):
-
-            print "   %5d  " % (ix - refDashes),
-            print refString[ix:ix+flen]
-            print "   %5d  " % (ix - readDashes),
-            print readString[ix:ix+flen]
-            print
-
-            refDashes  += refString.count('-', ix, ix+flen)
-            readDashes += readString.count('-', ix, ix+flen)
+            printAlignment (align, cmp, opt.flen)
 
     logger.debug("complete")
+
+def printAlignment (align, cmp, flen):
+
+    movie  = align['MovieId']
+    hole   = align['HoleNumber']
+    rStart = align['rStart']
+    rEnd   = align['rEnd']
+
+    print "%s/%d/%d_%d" % (movie, hole, rStart, rEnd);    # read name
+    print
+
+    refString, readString = cmp.getAlignmentStrings (align)
+
+    refDashes  = 0
+    readDashes = 0
+
+    for ix in xrange(0,len(refString),flen):
+
+        print "   %5d  " % (ix - refDashes),
+        print refString[ix:ix+flen]
+        print "   %5d  " % (ix - readDashes),
+        print readString[ix:ix+flen]
+        print
+
+        refDashes  += refString.count('-', ix, ix+flen)
+        readDashes += readString.count('-', ix, ix+flen)
+
+    return
 
 def getParms ():                       # use default input sys.argv[1:]
 
     parser = optparse.OptionParser(usage='%prog [options] <bas_file> <cmp_file>',
                                    description='Print (to stdout) alignment strings from a cmp.h5 file.')
 
+    parser.add_option ('--ZMW',      type='int', help='ZMW to print (def: all ZMWs)')
     parser.add_option ('--line-len', type='int', help='Number of bases in output line (def: %default)',
                        dest='flen')
 
