@@ -54,8 +54,8 @@ def main ():
     aln.setRead (H5BasFile.ADAPTER)     # adapter sequence is query
     minAdapterScore = opt.adapter * aln.getPenalties()[0] / 2
 
-    print "   ZMW     b/s stat prod tp  start end+1    len  aln chr st",
-    print "       from         to   off  astart  aend+1   mm ins del    Q"
+    print "   ZMW     b/s stat prod tp  start end+1    len  aln  chr st",
+    print "     from         to   off  astart  aend+1   mm  ins del    Q"
     print
 
     for hole in xrange(bf.numZMWs()):
