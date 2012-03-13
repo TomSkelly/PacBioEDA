@@ -73,10 +73,18 @@ Then do something like:
 A note about offsets:
 ~~~~~~~~~~~~~~~~~~~~
 
-Offsets printed are zero-based. The only exception to that is
-alignment coordinates against a reference genome. Start-stop intervals
-are printed python-style: The interval 0-10 is ten bases long, and its
-last base is offset 9.
+** REVISED REVISED REVISED REVISED **
+
+Offsets printed are zero-based. Start-stop intervals are printed
+python-style: The interval 0-10 is ten bases long, and its last base
+is offset 9.
+
+Alignment coordinates against a reference genome used to be a stated
+exception to this rule. But it turns out that the alignment start/stop
+offsets in a cmp.h5 file are zero-based. (I just discovered this --
+sorry!) Rather than go fixing this by adding bunch of +1's everywhere
+in the code, let's just let alignment offsets join the 0-based club
+along with everything else.
 
 
 Scripts:
