@@ -65,7 +65,7 @@ def main ():
 
 def printAlignment (align, cmp, flen):
 
-    movie  = align['MovieId']
+    movie  = cmp.movieName()
     hole   = align['HoleNumber']
     rStart = align['rStart']
     rEnd   = align['rEnd']
