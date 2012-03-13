@@ -38,7 +38,7 @@ def main ():
                               movieName=bf.movieName(),
                               maxHole=bf.numZMWs())
 
-    print "AlnID  RG   Hole Set Stb  SubRd      Start        End Ref St RefStrt  RefEnd   OffStrt    OffEnd"
+    print "AlnID  RG   Hole Set Stb  SubRd Seq Ref St      Start        End RefStrt  RefEnd   OffStrt    OffEnd"
     print
 
     if opt.sort == 'hole':
@@ -46,16 +46,16 @@ def main ():
         for align in cmp.getAlignmentsByHole():
             printAlign(align)
 
-    else :                                                    # must be 'none' 
+    else :                                                    # else, must be 'none' 
 
-        for align in cmp.getAllAlignments():                   # generator function, returns a dict
+        for align in cmp.getAllAlignments():                  # generator function, returns a dict
             printAlign(align)
 
     logger.debug("complete")
 
 def printAlign (align):
 
-    print "%5d  %2d  %5d  %2d  %2d  %5d  %2d  %1d  %9d  %9d  %6d  %6d  %8d  %8d   %5d  %5d" \
+    print "%5d  %2d  %5d  %2d  %2d  %5d  %2d  %2d  %1d  %9d  %9d  %6d  %6d  %8d  %8d   %5d  %5d" \
         % (align['AlignmentId'],
            align['ReadGroupId'],
            align['HoleNumber'],
@@ -63,6 +63,7 @@ def printAlign (align):
            align['StrobeNumber'],
            align['SubreadId'],
            align['RefSeqId'],
+           align['contig'],                # chicanery here, see H5CmpFile.py
            align['RCRefStrand'],
            align['tStart'],
            align['tEnd'],
@@ -80,10 +81,10 @@ def getParms ():                       # use default input sys.argv[1:]
     parser = optparse.OptionParser(usage='%prog [options] <bas_file> <cmp_file>',
                                    description='Print (to stdout) summary information about the contents of a cmp.h5 file.')
 
-    parser.add_option ('--sort', type='choice', choices=['hole'],
-                       help='Minimum HQ region score (def: %default)')
+    parser.add_option ('--sort', type='choice', choices=['hole', 'none'],
+                       help='desired sort order: none/hole (def: %default)')
 
-    parser.set_defaults (sort='hole')
+    parser.set_defaults (sort='none')
 
     opt, args = parser.parse_args()
 

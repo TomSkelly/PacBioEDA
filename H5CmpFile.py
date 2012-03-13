@@ -68,6 +68,11 @@
 #    ColName20 = nBackRead
 #    ColName21 = nReadOverlap
 
+# ALSO: Nothing in the above list is the actual chromosome/contig
+# number of the alignment. Given that the caller will probably want
+# that, we sneak it in in getAlignmentAsDict, as key 'contig' in the
+# returned dictionary. See getAlignmentAsDict for the details.
+
 import sys
 import h5py
 from tt_log import logger
@@ -102,6 +107,8 @@ BASE_MAP = ('-',  'A',  'C', None,
             )
 
 class CmpFile (object):
+    '''File-level interface to a cmp.h5 alignments file.'''
+
 
     def __init__ (self, fileName):
 
@@ -134,6 +141,7 @@ class CmpFile (object):
     # MovieName -- that's how he got there.
 
 class CmpMovie (object):
+    '''Access to data from one movie in a cmp.h5 file.'''
 
     def __init__ (self, cmpObject, movieName, maxHole=None):
 
@@ -142,6 +150,7 @@ class CmpMovie (object):
         self._movieName    = movieName
         self._top          = cmpObject.top()
         self._index        = self._top['AlnInfo/AlnIndex']
+        self._refMap       = self._top['RefGroup/RefInfoID']
         self._subreadMap   = None
         self._readGroups   = None
 
@@ -164,7 +173,26 @@ class CmpMovie (object):
 
         index = self._index
 
-        return dict(zip(INDEX_COLS, index[ix,:]))
+        ret = dict(zip(INDEX_COLS, index[ix,:]))
+
+        # In the alignment record, the actual chromosome/contig
+        # number, as defined by the reference file (the 'refNNNNNN'
+        # designator in the contig name, when reprocessed by
+        # SMRTportal), is not actually present. ReadGroupId (col 1) is
+        # an index into /AlnGroup/Path (see getReadGroups). Reads from
+        # two different movies mapping to the same chr will have
+        # different ReadGroupIds. And the order of chrs for two movies
+        # is not the same. RefSeqId (col 3) *will* be the same for
+        # reads mapping the same chr, and should be used as an index
+        # into RefGroup/RefInfoID to get the actual chr number.
+
+        # Rather than confront the user with the need to understand
+        # all that, we'll sneak an extra entry into the dict we create
+        # here. Key 'contig' will contain the chr number.
+
+        ret['contig'] = self._refMap[ret['RefSeqId']-1]     # RefSeqId runs 1..N, RefGroup/RefInfoID is 0..N-1
+
+        return ret
 
     def getAllAlignments (self):
         '''Generator function to return all indexes, in whatever order the file is sorted in.'''
@@ -240,11 +268,11 @@ class CmpMovie (object):
     def getSubreadMap (self):
         '''Create and cache a lookup table which maps a ZMW number to its mapped subreads'''
 
-        # Entries in AlnInfo/AlnIndex are ordered by alignment
-        # position, so the subread entries for a given ZMW will not be
-        # contiguous. Here we construct a list, indexed by ZMW#, of
-        # lists containing indexes into AlnInfo/AlnIndex for all
-        # subreads for the ZMW.
+        # Entries in AlnInfo/AlnIndex can be sorted in various ways
+        # (e.g., by alignment position), so the subread entries for a
+        # given ZMW may not be contiguous. Here we construct a list,
+        # indexed by ZMW#, of lists containing indexes into
+        # AlnInfo/AlnIndex for all subreads for the ZMW.
 
         if self._subreadMap is None:
 
@@ -253,15 +281,13 @@ class CmpMovie (object):
             ishape = self._index.shape
             self._subreadMap = [None] * (self._maxHole+1)
 
-            readGroups = self.getReadGroups()       # set of read group IDs for this movie
+            readGroups = self.getReadGroups()          # set of read group IDs for this movie
 
             kept   = 0
 
-            for ix in xrange(ishape[0]):
+            for ix in xrange(ishape[0]):               # for all alignments
 
-                # TODO: create multi-level index for all sets/strobes in one go
-
-                if self._index[ix,1] in readGroups:
+                if self._index[ix,1] in readGroups:    # if this is an alignment for the current movie
 
                     kept += 1
 
@@ -277,6 +303,11 @@ class CmpMovie (object):
 
     def getReadGroups (self):
         '''Find read groups in /AlnGroup/Path for this movie.'''
+
+        # Create and cache a dict whose key is ReadGroupId and whose
+        # value is h5 group containing the AlnArray and other datasets
+        # for that read group. See the comments in getAlignmentAsDict
+        # for further confusion on the issue.
 
         if self._readGroups is None:
 

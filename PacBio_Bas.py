@@ -104,7 +104,7 @@ def main ():
                 if cmp is not None:
                     align = cmp.getAlignmentByPosition (hole, start, end) # alignment record for this region
 
-                if align != None:                              # if the region aligned
+                if align is not None:                                     # if the region aligned
 
                     flag = 'I+'
                     print "%-2s  %5d %5d  %5d"  % (flag, start, end, insSize),
@@ -125,9 +125,9 @@ def main ():
                     else:
                         Q = -10.0 * math.log10 (float(totErrors) / float(alnLen))
 
-                    print "%4d  %2d  %1s  %9d  %9d  %4d  %6d  %6d  %3d %3d %3d %4.1f" % \
+                    print "%5d  %2d %1s  %9d  %9d  %4d  %6d  %6d  %3d %4d %3d %4.1f" % \
                         (alnLen,                               # length of aligned portion of read
-                         align['RefSeqId'],                    # chr/contig id
+                         align['contig'],                      # chr/contig id (see H5CmpFile)
                          '-' if align['RCRefStrand'] else '+', # strand
                          align['tStart'], align['tEnd'],       # reference offset of start/end of alignment
                          rStart-start,                         # offset of alignment start into insert
