@@ -38,7 +38,7 @@ def main ():
                               movieName=bf.movieName(),
                               maxHole=bf.numZMWs())
 
-    print "AlnID  RG   Hole Set Stb  SubRd Seq Ref St      Start        End RefStrt  RefEnd   OffStrt    OffEnd"
+    print " AlnID  RG   Hole Set Stb  SubRd Seq Ref St      Start        End RefStrt  RefEnd    OffStrt     OffEnd"
     print
 
     if opt.sort == 'hole':
@@ -55,7 +55,7 @@ def main ():
 
 def printAlign (align):
 
-    print "%5d  %2d  %5d  %2d  %2d  %5d  %2d  %2d  %1d  %9d  %9d  %6d  %6d  %8d  %8d   %5d  %5d" \
+    print "%6d  %2d  %5d  %2d  %2d  %5d  %2d  %2d  %1d  %9d  %9d  %6d  %6d  %9d  %9d   %5d  %5d" \
         % (align['AlignmentId'],
            align['ReadGroupId'],
            align['HoleNumber'],
