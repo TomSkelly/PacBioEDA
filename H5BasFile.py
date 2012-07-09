@@ -6,6 +6,7 @@
 # of module.
 
 import sys
+import numpy as np
 import re
 import h5py
 from tt_log import logger
@@ -43,6 +44,11 @@ class BasFile (object):
         self._holeStatus   = self._ZMW["HoleStatus"]
         self._productivity = self._ZMWMetrics["Productivity"]
 
+        self._consZMW    = self._top["PulseData/ConsensusBaseCalls/ZMW"]
+        self._consPasses = self._top["PulseData/ConsensusBaseCalls/Passes"]
+
+        self._consPassIndex = list(np.cumsum(self._consPasses["NumPasses"]))
+        self._consPassIndex.insert(0,0)      # ZMW 0 starts at 0
 
 ####        self._Basecall        = self._basecalls["Basecall"]           
 ####        self._DeletionQV      = self._basecalls["DeletionQV"]         
@@ -54,10 +60,13 @@ class BasFile (object):
 ####        self._QualityValue    = self._basecalls["QualityValue"]       
         self._WidthInFrames   = self._basecalls["WidthInFrames"]      
                                       
-        self._basecallIndex = None
-        self._regionIndex   = None
-        self._HQIndex       = None
-        self._coords        = None
+        self._basecallIndex  = None
+        self._consensusIndex = None
+        self._regionIndex    = None
+        self._HQIndex        = None
+        self._coords         = None
+
+        self._sanityChecked = False
 
         match = re.search('_s(\d+)_p(\d+)$', self.movieName())
         self._setNumber    = int(match.group(1))        # match.group(0) is entire match
@@ -109,36 +118,6 @@ class BasFile (object):
         holeXY = self._ZMW["HoleXY"]
         return holeXY[hole,:]
 
-    def basecallIndex (self):
-        '''Create and cache a table by hole number of starting indexes into PulseData/BaseCalls.'''
-
-        if self._basecallIndex == None:
-
-            logger.debug("creating basecall index")
-            
-            numEvent   = self._ZMW["NumEvent"]
-            holeNumber = self._ZMW["HoleNumber"]
-            numZ       = self.numZMWs()
-            index      = 0
-            self._basecallIndex = [0] * numZ
-
-            # The loop below includes a check that the HoleNumbers run
-            # from 0 to N-1. I.e., HoleNumber[ix] == ix. Otherwise,
-            # there is no way to get from the hole number of a region
-            # back to the ZMW entry (other than searching for it).
-
-            for ix in xrange(numZ):
-                
-                if holeNumber[ix] != ix:
-                    raise RuntimeError("Hole number != index at %d" % ix)
-
-                self._basecallIndex[ix] = index
-                index += numEvent[ix]
-
-            logger.debug("processed %d basecalls" % index)
-
-        return self._basecallIndex
-
     def cellCoords (self):
         '''Find and cache the minimum and maximum X/Y coordinates on the SMRTcell'''
 
@@ -146,25 +125,12 @@ class BasFile (object):
 
             logger.debug("finding SMRTcell coordinates")
 
-            numZ       = self.numZMWs()
             holeXY = self._ZMW["HoleXY"]
 
-            minX = maxX = holeXY[0,0]
-            minY = maxY = holeXY[0,1]
-
-            for ix in xrange(numZ):
-
-                x,y = holeXY[ix,:]
-
-                if x < minX:
-                    minX = x
-                elif x > maxX:
-                    maxX = x
-
-                if y < minY:
-                    minY = y
-                elif y > maxY:
-                    maxY = y
+            minX = min(holeXY[:,0])
+            maxX = max(holeXY[:,0])
+            minY = min(holeXY[:,1])
+            maxY = max(holeXY[:,1])
 
             self._coords = (minX, maxX, minY, maxY)
 
@@ -172,8 +138,48 @@ class BasFile (object):
 
         return self._coords
 
+    def elapsedFrames (self, hole, start=0, end=None):
+        '''Compute the number of frames in a sub-region of a read.'''
+
+        if end == None:
+            end = self._ZMW["NumEvent"][hole]
+
+        frames = 0
+        index      = self._getBasecallIndex()[hole]
+        startIndex = index + start
+        endIndex   = index + end
+
+        if end > start:
+            frames = sum(self._PreBaseFrames[startIndex:endIndex]) \
+                   + sum(self._WidthInFrames[startIndex:endIndex])
+
+        return frames
+
+    def _getBasecallIndex (self):
+        '''Create and cache a table by hole number of starting indexes into PulseData/BaseCalls.'''
+
+        if self._basecallIndex == None:
+
+            logger.debug("creating basecall index")
+            
+            numEvent   = self._ZMW["NumEvent"]
+            numZ       = self.numZMWs()
+            index      = 0                        # index into basecalls array
+            self._basecallIndex = [0] * numZ
+
+            for ix in xrange(numZ):               # for all ZMWs
+                self._basecallIndex[ix] = index
+                index += numEvent[ix]
+
+            logger.debug("processed %d basecalls" % index)
+
+        return self._basecallIndex
+
     def _fillRegionTables (self):
         '''Create and cache tables by hole number of starting and HQ indexes into PulseData/Regions.'''
+
+        # Both the start index and the HQ index require walking the
+        # regions table. Might as well do both in one pass.
 
         if self._regionIndex == None:
 
@@ -239,7 +245,7 @@ class BasFile (object):
             end = self.readLen(hole)
 
         baseData = self._basecalls[field]
-        index = self.basecallIndex()[hole]
+        index = self._getBasecallIndex()[hole]
 
         return baseData[index+start:index+end]
         
@@ -254,7 +260,7 @@ class BasFile (object):
             end = self.readLen(hole)
 
         baseData = self._basecalls["Basecall"]
-        index = self.basecallIndex()[hole]
+        index = self._getBasecallIndex()[hole]
         intBases = [chr(baseData[x]) for x in xrange(index+start, index+end)]
 
         return ''.join(intBases)
@@ -266,31 +272,142 @@ class BasFile (object):
             end = self.readLen(hole)
 
         baseData = self._basecalls["Basecall"]
-        index = self.basecallIndex()[hole]
+        index = self._getBasecallIndex()[hole]
 
         # Example: xrange(10,15) is [10,11,12,13,14]. xrange(14,9,-1) is [14,13,12,11,10]
 
         intBases = [COMPLEMENTS[baseData[x]] for x in xrange(index+end-1, index+start-1, -1)]
 
         return ''.join(intBases)
+
         
-    def elapsedFrames (self, hole, start=0, end=None):
-        '''Compute the number of frames in a sub-region of a read.'''
+    # The methods which follow are for accessing the consensus
+    # basecalls. Most of these routines have logic which is very
+    # similar to that of the routines for accessing the raw reads. But
+    # the structure, naming conventions, and semantics of the
+    # consensus data are different enough from the raw case that
+    # combining the access logic would have lead to a lot of
+    # complication. So I've opted to duplicate the logic.
 
-        frames = 0
+    # The structure of the consensus-related data in a bas.h5 file looks like:
 
-        if end == None:
-            end = self._ZMW["NumEvent"][hole]
+    #   PulseData                (Group)
+    #     ConsensusBaseCalls     (Group)
+    #       Basecall             [0..K]
+    #       DeletionQV           [0..K]
+    #       DeletionTag          [0..K]
+    #       InsertionQV          [0..K]
+    #       QualityValue         [0..K]
+    #       SubstitutionQV       [0..K]
+    #       SubstitutionTag      [0..K]
+    #       Passes               (Group)
+    #         NumPasses          [0..N]   <-- Note
+    #         AdapterHitAfter    [0..P]
+    #         AdapterHitBefore   [0..P]
+    #         PassDirection      [0..P]
+    #         PassNumBases       [0..P]
+    #         PassStartBase      [0..P]
+    #       ZMW                  (Group)
+    #         HoleNumber         [0..N]
+    #         HoleStatus         [0..N]
+    #         HoleXY             [0..N,0..1]
+    #         NumEvent           [0..N]
 
-        index      = self.basecallIndex()[hole]
-        startIndex = index + start
-        endIndex   = index + end
+    # where N is the highest ZMW number, K is the total number of
+    # consensus bases, and P is the total number of passes.  Given the
+    # way the datasets are indexed, the nesting is a bit awkward
+    # (IMHO).
 
-        if end > start:
-            frames = sum(self._PreBaseFrames[startIndex:endIndex]) \
-                   + sum(self._WidthInFrames[startIndex:endIndex])
+    def _getConsensusBasecallIndex (self):
+        '''Create and cache a table by hole number of starting indexes into PulseData/ConsensusBaseCalls.'''
 
-        return frames
+        # Dual of _getBasecallIndex.
+
+        if self._consensusIndex == None:
+
+            self.ZMWSanityClause()
+
+            logger.debug("creating consensus index")
+            
+            numEvent   = self._consZMW["NumEvent"]
+            holeNumber = self._consZMW["HoleNumber"]
+            numZ       = self.numZMWs()
+            index      = 0                        # index into basecalls array
+            self._consensusIndex = [0] * numZ
+
+            for ix in xrange(numZ):               # for all ZMWs
+                self._consensusIndex[ix] = index
+                index += numEvent[ix]
+
+            logger.debug("processed %d consensus basecalls" % index)
+
+        return self._consensusIndex
+
+    def ZMWSanityClause (self):
+        '''The trouble with a lot of code today is that there ain't no sanity clause.'''
+
+        # Check that the subfields of PulseData/BaseCalls/ZMW and
+        # PulseData/ConsensusBaseCalls/ZMW match, except for
+        # NumEvent. This is only a sanity check, and (assuming it
+        # passes) has no effect on the class's function. I.e., it
+        # doesn't need to be called, if you're the trusting sort.
+
+        # There is also a check that HoleNumber[ix] == ix. Otherwise,
+        # there is no way to get from the hole number of a region back
+        # to the ZMW entry (other than searching for it).
+
+        if not self._sanityChecked:               # we only need to check once
+
+            logger.debug("performing sanity check.")
+            
+            holeNumber     = self._ZMW["HoleNumber"]
+            holeStatus     = self._ZMW["HoleStatus"]
+            holeXY         = self._ZMW["HoleXY"]
+
+            holeNumberCons = self._consZMW["HoleNumber"]
+            holeStatusCons = self._consZMW["HoleStatus"]
+            holeXYCons     = self._consZMW["HoleXY"]
+
+            numZ = self.numZMWs()
+
+            if np.any(holeNumber[:] != xrange(numZ)):
+                raise RuntimeError("Hole number != index")
+
+            if np.any(holeNumber[:] != holeNumberCons[:]):
+                raise RuntimeError("Hole number != consensus hole number")
+
+            if np.any(holeStatus[:] != holeStatusCons[:]):
+                raise RuntimeError("Hole status != consensus hole status")
+
+            if np.any(holeXY[:] != holeXYCons[:]):
+                raise RuntimeError("Hole XY != consensus hole XY")
+
+            self._sanityChecked = True
+            logger.debug("sanity check passed")
+
+        return                      # nothing returned -- if we return at all, we passed!
+
+    def holeConsensusPasses (self, hole):
+        '''Generator which returns consensus passes for specified hole, one by one'''
+
+        # Dual of holeRegions, sort of.
+
+        passIndex = self._consPassIndex
+        passes    = self._consPasses
+        numPasses = passes["NumPasses"]
+
+        for passNo in xrange(numPasses[hole]):
+            ix = passIndex[hole] + passNo
+            yield {"AdapterHitAfter":  passes["AdapterHitAfter"][ix], \
+                   "AdapterHitBefore": passes["AdapterHitBefore"][ix], \
+                   "PassDirection":    passes["PassDirection"][ix], \
+                   "PassNumBases":     passes["PassNumBases"][ix], \
+                   "PassStartBase":    passes["PassStartBase"][ix]}
+
+        return
+
+    # TODO: Need to implement getConsensusBasecallField, getConsensusSequence, and getRevCompConsensusSequence.
+
 
 # Copyright (C) 2011 Genome Research Limited
 #

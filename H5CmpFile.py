@@ -100,7 +100,7 @@ INDEX_COLS = ('AlignmentId',
               'nBackRead',
               'nReadOverlap')
 
-BASE_MAP = ('-',  'A',  'C', None,
+BASE_MAP = ('-',  'A',  'C', None,       # encoding for alnArray 4-bit subfields
             'G', None, None, None,
             'T', None, None, None,
             None, None, None, 'N',
@@ -261,6 +261,8 @@ class CmpMovie (object):
 
         refString  = []
         readString = []
+
+        # An alnArray entry is an 8-bit integer encoding read and references bases in 4 bits each.
 
         for bases in alnArray[align['offset_begin']:align['offset_end']]:
             refString.append(BASE_MAP[bases & 0x0f])

@@ -168,7 +168,31 @@ def main ():
             else:
                 raise ValueError ("unrecognised region type %d in ZMW %d" % (regionType, hole))
 
+        if not opt.nocons:
+            printPassesForHole (bf, hole)       # process consensus read passes
+
     logger.debug("complete")
+
+def printPassesForHole (bf, hole):
+    '''Print consensus read passes for specified hole.'''
+
+    zStat    = bf.holeStatusStr(hole)  # this is a string, not a number
+    zProd    = bf.productivity(hole)
+
+    for passDict in bf.holeConsensusPasses(hole):
+
+        start    = passDict["PassStartBase"] 
+        numBases = passDict["PassNumBases"]
+        end      = start + numBases
+
+        before = 'B' if passDict["AdapterHitBefore"] else ' '
+        after  = 'A' if passDict["AdapterHitAfter"]  else ' '
+        dir    = '-' if passDict["PassDirection"]    else '+'
+
+        print "%6d          %-5s  %d" % (hole, zStat, zProd),
+        print "C   %5d %5d  %5d        %s%s %s" % (start, end, numBases, before, after, dir)
+
+    return
 
 def getParms ():                       # use default input sys.argv[1:]
 
@@ -178,6 +202,7 @@ def getParms ():                       # use default input sys.argv[1:]
     parser.add_option ('--score',    type='int', help='minimum HQ region score (def: %default)')
     parser.add_option ('--length',   type='int', help='minimum HQ region length (def: %default)')
     parser.add_option ('--adapter',  type='int', help='expected adapter length (def: %default)')
+    parser.add_option ('--nocons',   action='store_true', help='do not print consensus passes lines')
 
     parser.set_defaults (score=DEF_SCORE_THRESHOLD,
                          length=DEF_HQ_LENGTH,
@@ -205,6 +230,8 @@ def lineHelp ():
 
      AD: A   Adapter within HQ region
          a   Adapter outside HQ region
+
+     CO: C   Consensus read pass
 
  Insert line columns:
 
