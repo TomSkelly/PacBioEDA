@@ -176,8 +176,9 @@ def main ():
 def printPassesForHole (bf, hole):
     '''Print consensus read passes for specified hole.'''
 
-    zStat    = bf.holeStatusStr(hole)  # this is a string, not a number
-    zProd    = bf.productivity(hole)
+    zStat   = bf.holeStatusStr(hole)  # this is a string, not a number
+    zProd   = bf.productivity(hole)
+    consLen = bf.consReadLen(hole)
 
     for passDict in bf.holeConsensusPasses(hole):
 
@@ -190,7 +191,11 @@ def printPassesForHole (bf, hole):
         dir    = '-' if passDict["PassDirection"]    else '+'
 
         print "%6d          %-5s  %d" % (hole, zStat, zProd),
-        print "C   %5d %5d  %5d        %s%s %s" % (start, end, numBases, before, after, dir)
+        print "c   %5d %5d  %5d        %s%s %s" % (start, end, numBases, before, after, dir)
+
+    if consLen > 0:
+        print "%6d          %-5s  %d" % (hole, zStat, zProd),
+        print "C                %5d" % (consLen)
 
     return
 
@@ -231,7 +236,8 @@ def lineHelp ():
      AD: A   Adapter within HQ region
          a   Adapter outside HQ region
 
-     CO: C   Consensus read pass
+     CO: c   Consensus read pass
+         C   Consensus read length
 
  Insert line columns:
 

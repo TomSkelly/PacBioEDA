@@ -44,20 +44,14 @@ class BasFile (object):
         self._holeStatus   = self._ZMW["HoleStatus"]
         self._productivity = self._ZMWMetrics["Productivity"]
 
-        self._consZMW    = self._top["PulseData/ConsensusBaseCalls/ZMW"]
-        self._consPasses = self._top["PulseData/ConsensusBaseCalls/Passes"]
+        self._consBasecalls = self._top["PulseData/ConsensusBaseCalls"]
+        self._consZMW       = self._top["PulseData/ConsensusBaseCalls/ZMW"]
+        self._consPasses    = self._top["PulseData/ConsensusBaseCalls/Passes"]
 
         self._consPassIndex = list(np.cumsum(self._consPasses["NumPasses"]))
         self._consPassIndex.insert(0,0)      # ZMW 0 starts at 0
 
-####        self._Basecall        = self._basecalls["Basecall"]           
-####        self._DeletionQV      = self._basecalls["DeletionQV"]         
-####        self._DeletionTag     = self._basecalls["DeletionTag"]        
-####        self._InsertionQV     = self._basecalls["InsertionQV"]        
         self._PreBaseFrames   = self._basecalls["PreBaseFrames"]      
-####        self._SubstitutionQV  = self._basecalls["SubstitutionQV"]     
-####        self._SubstitutionTag = self._basecalls["SubstitutionTag"]    
-####        self._QualityValue    = self._basecalls["QualityValue"]       
         self._WidthInFrames   = self._basecalls["WidthInFrames"]      
                                       
         self._basecallIndex  = None
@@ -318,6 +312,9 @@ class BasFile (object):
     # way the datasets are indexed, the nesting is a bit awkward
     # (IMHO).
 
+    def consReadLen (self, hole):
+        return self._consZMW["NumEvent"][hole]
+
     def _getConsensusBasecallIndex (self):
         '''Create and cache a table by hole number of starting indexes into PulseData/ConsensusBaseCalls.'''
 
@@ -406,10 +403,46 @@ class BasFile (object):
 
         return
 
-    # TODO: Need to implement getConsensusBasecallField, getConsensusSequence, and getRevCompConsensusSequence.
+    def getConsensusBasecallField (self, field, hole, start=0, end=None):
+        '''Return one field of the basecalls dataset from a region of a ZMW as an array.'''
+
+        if end == None:
+            end = self.consReadLen(hole)
+
+        baseData = self._consBasecalls[field]
+        index = self._getConsensusBasecallIndex()[hole]
+
+        return baseData[index+start:index+end]
+        
+    def getConsensusSequence (self, hole, start=0, end=None):
+        '''Return the basecalls from a region of a ZMW as an ascii string.'''
+
+        if end == None:
+            end = self.consReadLen(hole)
+
+        baseData = self._consBasecalls["Basecall"]
+        index = self._getConsensusBasecallIndex()[hole]
+        intBases = [chr(baseData[x]) for x in xrange(index+start, index+end)]
+
+        return ''.join(intBases)
+        
+    def getRevCompConsensusSequence (self, hole, start=0, end=None):
+        '''Return the REVERSE_COMPLEMENTED basecalls from a region of a ZMW as an ascii string.'''
+
+        if end == None:
+            end = self.consReadLen(hole)
+
+        baseData = self._consBasecalls["Basecall"]
+        index = self._getConsensusBasecallIndex()[hole]
+
+        # Example: xrange(10,15) is [10,11,12,13,14]. xrange(14,9,-1) is [14,13,12,11,10]
+
+        intBases = [COMPLEMENTS[baseData[x]] for x in xrange(index+end-1, index+start-1, -1)]
+
+        return ''.join(intBases)
 
 
-# Copyright (C) 2011 Genome Research Limited
+# Copyright (C) 2012 Genome Research Limited
 #
 # This library is free software. You can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
