@@ -47,7 +47,7 @@ def main ():
     cf  = H5CmpFile.CmpFile (fileName=cmpFilename)
     cmp = H5CmpFile.CmpMovie (cmpObject=cf,
                               movieName=movie,
-                              maxHole=bf.numZMWs())
+                              maxHole=bf.maxZMW())
 
     if opt.ZMW is not None:                      # did we ask for a specific ZMW?
 

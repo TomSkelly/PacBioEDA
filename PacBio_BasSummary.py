@@ -61,7 +61,7 @@ def main ():
         cf  = H5CmpFile.CmpFile (fileName=cmpFilename)
         cmp = H5CmpFile.CmpMovie (cmpObject=cf,
                                   movieName=bf.movieName(),
-                                  maxHole=bf.numZMWs())
+                                  maxHole=bf.maxZMW())
 
     totalC   = Counter('Total')
     seqC     = Counter('--Sequencing')
@@ -76,7 +76,7 @@ def main ():
     longest    = 0
     longestZMW = None
 
-    for hole in xrange(bf.numZMWs()):
+    for hole in bf.holeNumbers():
 
         numBases = bf.readLen(hole)
         zProd    = bf.productivity(hole)

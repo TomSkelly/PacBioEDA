@@ -48,7 +48,7 @@ def main ():
         cf  = H5CmpFile.CmpFile (fileName=cmpFilename)
         cmp = H5CmpFile.CmpMovie (cmpObject=cf,
                                   movieName=bf.movieName(),
-                                  maxHole=bf.numZMWs())
+                                  maxHole=bf.maxZMW())
 
     aln = SWAligner.Aligner()           # we'll use this in the loop below for finding adapters
     aln.setRead (H5BasFile.ADAPTER)     # adapter sequence is query
@@ -58,7 +58,7 @@ def main ():
     print "     from         to   off  astart  aend+1   mm  ins del    Q"
     print
 
-    for hole in xrange(bf.numZMWs()):
+    for hole in bf.holeNumbers():
 
         numBases = bf.readLen(hole)
         zStat    = bf.holeStatusStr(hole)  # this is a string, not a number

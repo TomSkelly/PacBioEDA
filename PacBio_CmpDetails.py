@@ -36,7 +36,7 @@ def main ():
     cf  = H5CmpFile.CmpFile (fileName=cmpFilename)
     cmp = H5CmpFile.CmpMovie (cmpObject=cf,
                               movieName=bf.movieName(),
-                              maxHole=bf.numZMWs())
+                              maxHole=bf.maxZMW())
 
     print " AlnID  RG   Hole Set Stb  SubRd Seq Ref St      Start        End RefStrt  RefEnd    OffStrt     OffEnd"
     print

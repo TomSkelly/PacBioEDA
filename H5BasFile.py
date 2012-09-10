@@ -48,12 +48,17 @@ class BasFile (object):
         self._consZMW       = self._top["PulseData/ConsensusBaseCalls/ZMW"]
         self._consPasses    = self._top["PulseData/ConsensusBaseCalls/Passes"]
 
-        self._consPassIndex = list(np.cumsum(self._consPasses["NumPasses"]))
-        self._consPassIndex.insert(0,0)      # ZMW 0 starts at 0
+        self._PreBaseFrames = self._basecalls["PreBaseFrames"]      
+        self._WidthInFrames = self._basecalls["WidthInFrames"]      
 
-        self._PreBaseFrames   = self._basecalls["PreBaseFrames"]      
-        self._WidthInFrames   = self._basecalls["WidthInFrames"]      
+        self._maxZMW = max(self._ZMW["HoleNumber"])     # this takes a surprisingly long time to compute
                                       
+        self._ZMWIndex      = None
+        self._fillZMWIndex()          # why now? See note in _fillZMWIndex
+
+        self._consPassIndex = None
+        self._fillPassIndex()         # same here
+
         self._basecallIndex  = None
         self._consensusIndex = None
         self._regionIndex    = None
@@ -93,24 +98,36 @@ class BasFile (object):
     def numRegions (self):
         return self._numRegions
 
-    def numZMWs (self):
-        return len(self._ZMW["HoleNumber"])
-
     def holeStatusStr (self, hole):               # returns a string
-        return holeStatusTable[self._holeStatus[hole]]
+        index = self._ZMWIndex[hole]
+        return holeStatusTable[self._holeStatus[index]]
 
     def isSequencingZMW (self, hole):
-        return self._holeStatus[hole] == 0
+        index = self._ZMWIndex[hole]
+        return self._holeStatus[index] == 0
 
     def productivity (self, hole):
-        return self._productivity[hole]
+        index = self._ZMWIndex[hole]
+        return self._productivity[index]
 
     def readLen (self, hole):
-        return self._ZMW["NumEvent"][hole]
+        index = self._ZMWIndex[hole]
+        return self._ZMW["NumEvent"][index]
 
     def holeXY (self, hole):
+        index = self._ZMWIndex[hole]
         holeXY = self._ZMW["HoleXY"]
-        return holeXY[hole,:]
+        return holeXY[index,:]
+
+    def numZMWs (self):        # N = number of ZMWs reported in file, not necessarily numbered 0..N-1
+        return len(self._ZMW["HoleNumber"])
+
+    def maxZMW (self):         # maximum ZMW# (not max+1, which would perhaps be more pythonic...)
+        return self._maxZMW
+
+    def holeNumbers (self):
+        '''Return HDF5 array of hole numbers which actually exist in /PulseData/BaseCalls/ZMW/HoleNumber.'''
+        return self._ZMW["HoleNumber"]
 
     def cellCoords (self):
         '''Find and cache the minimum and maximum X/Y coordinates on the SMRTcell'''
@@ -136,7 +153,7 @@ class BasFile (object):
         '''Compute the number of frames in a sub-region of a read.'''
 
         if end == None:
-            end = self._ZMW["NumEvent"][hole]
+            end = self.readLen(hole)
 
         frames = 0
         index      = self._getBasecallIndex()[hole]
@@ -149,20 +166,51 @@ class BasFile (object):
 
         return frames
 
+    def _fillZMWIndex (self):
+        '''Create and cache a table by hole number of starting indexes into PulseData/BaseCalls/ZMW.'''
+
+        # ZMWIndex is always filled when the BasFile object is
+        # created, unlike the case of basecallIndex and regionIndex,
+        # which are filled only when they are first accessed. ZMWIndex
+        # will be needed for any meaningful bas file access. Creating
+        # it initially eliminates the need to check, on every access,
+        # whether it exists.
+
+        numHoles = self.numZMWs()
+        maxHole  = self.maxZMW()
+
+        logger.debug("creating ZMW index for %d holes, last hole is %d" % (numHoles, maxHole))
+            
+        self._ZMWIndex = [None] * (maxHole+1)
+
+        holeNumber = self._ZMW["HoleNumber"]
+        numEvent   = self._ZMW["NumEvent"]
+
+        for ix in xrange(numHoles):
+            hole = holeNumber[ix]
+            self._ZMWIndex[hole] = ix
+
+        logger.debug("complete")
+
     def _getBasecallIndex (self):
         '''Create and cache a table by hole number of starting indexes into PulseData/BaseCalls.'''
 
         if self._basecallIndex == None:
 
-            logger.debug("creating basecall index")
-            
-            numEvent   = self._ZMW["NumEvent"]
-            numZ       = self.numZMWs()
-            index      = 0                        # index into basecalls array
-            self._basecallIndex = [0] * numZ
+            numHoles = self.numZMWs()
+            maxHole  = self.maxZMW()
 
-            for ix in xrange(numZ):               # for all ZMWs
-                self._basecallIndex[ix] = index
+            logger.debug("creating basecall index for %d holes, last hole is %d" % (numHoles, maxHole))
+            
+            self._basecallIndex = [None] * (maxHole+1)
+
+            holeNumber = self._ZMW["HoleNumber"]
+            numEvent   = self._ZMW["NumEvent"]
+            index      = 0                        # index into basecalls array
+
+            for ix in xrange(numHoles):
+                hole = holeNumber[ix]
+                self._basecallIndex[hole] = index
                 index += numEvent[ix]
 
             logger.debug("processed %d basecalls" % index)
@@ -177,10 +225,13 @@ class BasFile (object):
 
         if self._regionIndex == None:
 
-            logger.debug("creating region index")
+            numHoles = self.numZMWs()
+            maxHole  = self.maxZMW()
+
+            logger.debug("creating region index for %d holes, last hole is %d" % (numHoles, maxHole))
             
-            self._regionIndex = [0] * self.numZMWs()
-            self._HQIndex     = [0] * self.numZMWs()
+            self._regionIndex = [None] * (maxHole+1)
+            self._HQIndex     = [None] * (maxHole+1)
 
             regions  = self._regions
             index    = 0
@@ -189,6 +240,9 @@ class BasFile (object):
             for line in regions:
 
                 hole, regionType = line[0:2]
+
+                if hole < 0 or hole > maxHole:          # sanity check hole# from region table
+                    raise RuntimeError("hole number %d out of range" % (hole))
 
                 if hole != lastHole:                    # start of new hole?
                     self._regionIndex[hole] = index
@@ -235,6 +289,8 @@ class BasFile (object):
     def getBasecallField (self, field, hole, start=0, end=None):
         '''Return one field of the basecalls dataset from a region of a ZMW as an array.'''
 
+        # Note that, per python convention, range returned is (start..end-1).
+
         if end == None:
             end = self.readLen(hole)
 
@@ -249,6 +305,8 @@ class BasFile (object):
         # The logic of getBasecallField is duplicated here, rather
         # than called, for efficiency, since this routine is expected
         # to be called a lot.
+
+        # Note that, per python convention, range returned is (start..end-1).
 
         if end == None:
             end = self.readLen(hole)
@@ -313,7 +371,39 @@ class BasFile (object):
     # (IMHO).
 
     def consReadLen (self, hole):
-        return self._consZMW["NumEvent"][hole]
+        index = self._ZMWIndex[hole]
+        return self._consZMW["NumEvent"][index]
+
+    def _fillPassIndex (self):
+        '''Create and cache a table by hole number of starting indexes into PulseData/ConsensusBaseCalls/Passes.'''
+
+        # Same story here as for fillZMWIndex: It's quick, call it
+        # from the constructor, then there's no need to check whether
+        # it exists every time we access it.
+
+        # Note that we'll create a consPassIndex entry for every hole
+        # which exists, whether or not it has any consensus
+        # passes. That means we rely on the user to check that
+        # numPasses is non-zero before using consPassIndex.
+
+        numHoles = self.numZMWs()
+        maxHole  = self.maxZMW()
+
+        logger.debug("creating consensus pass index for %d holes, last hole is %d" % (numHoles, maxHole))
+            
+        self._consPassIndex = [None] * (maxHole+1)
+
+        holeNumber = self._consZMW["HoleNumber"]
+        passes     = self._consPasses
+        numPasses  = passes["NumPasses"]
+        index      = 0            # index into arrays in passes group
+
+        for ix in xrange(numHoles):
+            hole = holeNumber[ix]
+            self._consPassIndex[hole] = index
+            index += numPasses[ix]
+
+        logger.debug("processed %d passes" % index)
 
     def _getConsensusBasecallIndex (self):
         '''Create and cache a table by hole number of starting indexes into PulseData/ConsensusBaseCalls.'''
@@ -322,18 +412,22 @@ class BasFile (object):
 
         if self._consensusIndex == None:
 
-            self.ZMWSanityClause()
+            self.ZMWSanityClause()     # make sure PulseData/BaseCalls matches PulseData/ConsensusBaseCalls
 
             logger.debug("creating consensus index")
             
+            numHoles = self.numZMWs()
+            maxHole  = self.maxZMW()
+
+            self._consensusIndex = [None] * (maxHole+1)
+
             numEvent   = self._consZMW["NumEvent"]
             holeNumber = self._consZMW["HoleNumber"]
-            numZ       = self.numZMWs()
-            index      = 0                        # index into basecalls array
-            self._consensusIndex = [0] * numZ
+            index      = 0                            # index into basecalls array
 
-            for ix in xrange(numZ):               # for all ZMWs
-                self._consensusIndex[ix] = index
+            for ix in xrange(numHoles):               # for all ZMWs
+                hole = holeNumber[ix]
+                self._consensusIndex[hole] = index
                 index += numEvent[ix]
 
             logger.debug("processed %d consensus basecalls" % index)
@@ -349,10 +443,6 @@ class BasFile (object):
         # passes) has no effect on the class's function. I.e., it
         # doesn't need to be called, if you're the trusting sort.
 
-        # There is also a check that HoleNumber[ix] == ix. Otherwise,
-        # there is no way to get from the hole number of a region back
-        # to the ZMW entry (other than searching for it).
-
         if not self._sanityChecked:               # we only need to check once
 
             logger.debug("performing sanity check.")
@@ -364,11 +454,6 @@ class BasFile (object):
             holeNumberCons = self._consZMW["HoleNumber"]
             holeStatusCons = self._consZMW["HoleStatus"]
             holeXYCons     = self._consZMW["HoleXY"]
-
-            numZ = self.numZMWs()
-
-            if np.any(holeNumber[:] != xrange(numZ)):
-                raise RuntimeError("Hole number != index")
 
             if np.any(holeNumber[:] != holeNumberCons[:]):
                 raise RuntimeError("Hole number != consensus hole number")
@@ -392,8 +477,9 @@ class BasFile (object):
         passIndex = self._consPassIndex
         passes    = self._consPasses
         numPasses = passes["NumPasses"]
+        index = self._ZMWIndex[hole]
 
-        for passNo in xrange(numPasses[hole]):
+        for passNo in xrange(numPasses[index]):
             ix = passIndex[hole] + passNo
             yield {"AdapterHitAfter":  passes["AdapterHitAfter"][ix], \
                    "AdapterHitBefore": passes["AdapterHitBefore"][ix], \

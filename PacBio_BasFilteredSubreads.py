@@ -44,7 +44,7 @@ def main ():
     numReads = 0
     numBases = 0
 
-    for hole in xrange(bf.numZMWs()):
+    for hole in bf.holeNumbers():
 
         if bf.isSequencingZMW(hole):
             

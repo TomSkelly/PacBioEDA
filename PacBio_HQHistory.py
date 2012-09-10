@@ -33,7 +33,7 @@ def main ():
 
     HQTimes = []
 
-    for hole in xrange(bf.numZMWs()):       # find start and end times of HQ region for each ZMW
+    for hole in bf.holeNumbers():       # find start and end times of HQ region for each ZMW
 
         if bf.isSequencingZMW(hole) and bf.productivity(hole) == 1:
 

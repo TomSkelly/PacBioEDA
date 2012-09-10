@@ -32,10 +32,10 @@ def main ():
     opt, args = getParms()
 
     basFilename = args[0]
-    basfile = H5BasFile.BasFile (basFilename)
+    bf = H5BasFile.BasFile (basFilename)
 
-    basecalls     = basfile.basecalls()
-    numZ          = basfile.numZMWs()
+    basecalls     = bf.basecalls()
+    numZ          = bf.numZMWs()
 
     framesPerBin  = opt.bin * H5BasFile.frameRate
 
@@ -45,17 +45,17 @@ def main ():
 
     numEmpty = 0
 
-    for hole in xrange(numZ):
+    for hole in bf.holeNumbers():
 
-        HQStart, HQEnd = basfile.HQregion(hole)[2:4]
+        HQStart, HQEnd = bf.HQregion(hole)[2:4]
 
         if HQEnd == 0:
             numEmpty += 1
         else:
 
-            preHQTime  = basfile.elapsedFrames(hole, 0,   HQStart)
-            inHQTime   = basfile.elapsedFrames(hole, HQStart, HQEnd)
-            postHQTime = basfile.elapsedFrames(hole, HQEnd, basfile.readLen(hole))
+            preHQTime  = bf.elapsedFrames(hole, 0,   HQStart)
+            inHQTime   = bf.elapsedFrames(hole, HQStart, HQEnd)
+            postHQTime = bf.elapsedFrames(hole, HQEnd, bf.readLen(hole))
 
             HQStartBin = int(preHQTime  / framesPerBin)
             HQEndBin   = int(inHQTime   / framesPerBin) + HQStartBin

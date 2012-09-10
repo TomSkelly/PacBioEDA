@@ -1,8 +1,15 @@
+2012-09-10:
+~~~~~~~~~~
+
+Added logic to deal with .bas.h5 files where ZMWs are not numbered
+continuously 0..N-1. Previously I had assumed that would always be
+true -- until someone produced a file which broke the rule.
+
 
 2012-03-13:
 ~~~~~~~~~~
 
-Fixed bug in H5CmpFile.py which produced incorrect reference contif
+Fixed bug in H5CmpFile.py which produced incorrect reference contig
 numbers.
 
 
