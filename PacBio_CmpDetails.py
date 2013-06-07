@@ -38,6 +38,8 @@ def main ():
                               movieName=bf.movieName(),
                               maxHole=bf.maxZMW())
 
+    cf.printDetails()
+
     print " AlnID  RG   Hole Set Stb  SubRd Seq Ref St      Start        End RefStrt  RefEnd    OffStrt     OffEnd"
     print
 

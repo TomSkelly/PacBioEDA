@@ -116,7 +116,8 @@ class CmpFile (object):
 
         self._fileName = fileName
         self._infile   = h5py.File (fileName, 'r')
-        self._top      = h5py.Group (self._infile, '/')
+####        self._top      = h5py.Group (self._infile, '/')
+        self._top      = self._infile         # h5py 2.0.1 change!
 
         return
 
@@ -132,6 +133,23 @@ class CmpFile (object):
         list = self._top['MovieInfo/Name']
         for movie in list:
             yield movie
+
+        return
+
+    def printDetails (self):
+        '''Debug routine to print a bunch of stuff from the file to the log. Not production grade.'''
+
+        movName = self._top['MovieInfo/Name']
+        movID   = self._top['MovieInfo/ID']
+        for ix in xrange(len(movName)):
+            logger.debug("movie %d (%d): %s" % (ix, movID[ix], movName[ix]))
+
+        path  = self._top['AlnGroup/Path']
+        ID    = self._top['AlnGroup/ID']
+        for ix in xrange(len(path)):
+            logger.debug("path %d (%d): %s" % (ix, ID[ix], path[ix]))
+
+####        logger.debug("" % ())
 
         return
 
@@ -159,11 +177,26 @@ class CmpMovie (object):
         else:
             self._maxHole = maxHole
 
+        # Search the /MovieInfo group looking for the movie of
+        # interest, and save its ID. We'll use that later to select
+        # alignments for this movie from /AlnInfo/AlnIndex.
+
+        movName = self._top['MovieInfo/Name']
+        movID   = self._top['MovieInfo/ID']
+        self._movieID = None
+        for ix in xrange(len(movName)):
+            if movName[ix] == self._movieName:
+                self._movieID = movID[ix]
+                logger.debug("movie ID is %d" % movID[ix])
+                break
+        if self._movieID is None:
+            logger.debug("movie not found in /MovieInfo/Name")
+            raise RuntimeError
+
         # Should we call getSubreadMap at this point? It's fairly
         # time-consuming. Let's put it off until it's actually needed.
 
         return
-
 
     def movieName (self):
         return self._movieName
@@ -289,10 +322,12 @@ class CmpMovie (object):
             readGroups = self.getReadGroups()          # set of read group IDs for this movie
 
             kept   = 0
+            movieID = self._movieID
 
             for ix in xrange(ishape[0]):               # for all alignments
 
-                if self._index[ix,1] in readGroups:    # if this is an alignment for the current movie
+####                if self._index[ix,1] in readGroups:    # if this is an alignment for the current movie
+                if self._index[ix,2] == movieID:    # if this is an alignment for the current movie
 
                     kept += 1
 
@@ -325,8 +360,10 @@ class CmpMovie (object):
             ID    = self._top['AlnGroup/ID']
 
             for ix in xrange(len(path)):
-                if path[ix].endswith(movie):
-                    self._readGroups[ID[ix]] = self._top[path[ix]]
+                logger.debug("path %d, ID %d: %s" % (ix, ID[ix], path[ix]))
+####                if path[ix].endswith(movie):
+####                    self._readGroups[ID[ix]] = self._top[path[ix]]
+                self._readGroups[ID[ix]] = self._top[path[ix]]
                     
             logger.debug("kept %d of %d ReadGroups for this movie" % (len(self._readGroups), len(path)))
 

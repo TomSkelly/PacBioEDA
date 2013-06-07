@@ -201,7 +201,7 @@ class Counter (object):
         self._numReads    = 0
         self._numSubreads = 0
         self._numBases    = 0
-        self._whichZMW    = None
+        self._whichZMW    = -1         # used to use None, but it messed up %d print
         self._maxLen      = 0          # WARNING: assumes value >= 0
 
     def incr (self, reads, regions, bases):

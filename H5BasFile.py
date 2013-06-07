@@ -33,7 +33,8 @@ class BasFile (object):
 
         self._filename   = filename
         self._infile     = h5py.File (filename, 'r')
-        self._top        = h5py.Group (self._infile, '/')
+####        self._top        = h5py.Group (self._infile, '/')
+        self._top        = self._infile         # h5py 2.0.1 change!
 
         self._basecalls  = self._top["PulseData/BaseCalls"]
         self._ZMW        = self._top["PulseData/BaseCalls/ZMW"]

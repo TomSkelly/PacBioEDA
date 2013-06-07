@@ -51,7 +51,9 @@ def main ():
 
     infile = h5py.File (infile_name, 'r')
 
-    top = h5py.Group (infile, '/')
+
+####    top = h5py.Group (infile, '/')
+    top = infile
 
     query (top, 0)
 
