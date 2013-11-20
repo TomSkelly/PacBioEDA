@@ -8,9 +8,9 @@
 set -o errexit
 set -o nounset
 
-tools=~ts6/work/new-pipeline-dev/tools/trunk/PacBioEDA   # you'll need to change this
+tools=~skellytf/work/PacBioEDA                           # you'll need to change this
 
-export SEYMOUR_HOME=/software/PacBio/smrtanalysis        # and this
+export SEYMOUR_HOME=/is2/projects/pacbio/static/software/smrtanalysis      # and this
 
 export LD_LIBRARY_PATH=${SEYMOUR_HOME}/analysis/lib:${LD_LIBRARY_PATH:=}
 export LD_LIBRARY_PATH=${SEYMOUR_HOME}/analysis/lib/atlas:${LD_LIBRARY_PATH:=}
