@@ -13,6 +13,10 @@
 # inter-pulse times), and use that time information to update our
 # histogram.
 
+# See also PacBio_HQHistory.py, which presents the same story as a
+# time series of plots showing the spatial distribution of HQ ZMWs on
+# the SMRTcell.
+
 import sys
 import optparse
 import H5BasFile
@@ -34,7 +38,6 @@ def main ():
     basFilename = args[0]
     bf = H5BasFile.BasFile (basFilename)
 
-    basecalls     = bf.basecalls()
     numZ          = bf.numZMWs()
 
     framesPerBin  = opt.bin * H5BasFile.frameRate
