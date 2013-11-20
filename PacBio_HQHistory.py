@@ -16,7 +16,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 DEF_START = 0
-DEF_STEP  = 60
+DEF_STEP  = 300        # 300 * 6 * 4 = 7200 = a 2-hour movie
 DEF_NROWS = 6
 DEF_NCOLS = 4
 DEF_OUTPUT='HQ-history.png'
