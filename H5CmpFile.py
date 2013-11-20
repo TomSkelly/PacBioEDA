@@ -226,7 +226,10 @@ class CmpMovie (object):
         # all that, we'll sneak an extra entry into the dict we create
         # here. Key 'contig' will contain the chr number.
 
-        ret['contig'] = self._refMap[ret['RefSeqId']-1]     # RefSeqId runs 1..N, RefGroup/RefInfoID is 0..N-1
+#### All the above appears to have been invalidated in release 1.4.0. 
+
+####        ret['contig'] = self._refMap[ret['RefSeqId']-1]     # RefSeqId runs 1..N, RefGroup/RefInfoID is 0..N-1
+        ret['contig'] = ret['RefSeqId']
 
         return ret
 

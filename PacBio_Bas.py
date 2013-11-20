@@ -9,6 +9,11 @@
 # parameter is input *.bas.h5 file. Optional second parameter is
 # *.cmp.h5 file. Output is to stdout, redirect with >.
 
+# CCS reads are also printed if they exist in the *.bas.h5 file. Note
+# that this will no longer be the case starting with SMRTanalysis
+# release 2.1.0, wherein CCS reads are produced offline in te
+# secondary analysis step.
+
 # NOTE: For help in interpreting the various line types printed by
 # this script, do "PacBio_Bas.py --linehelp". Or see the lineHelp
 # method below.
@@ -20,6 +25,8 @@ import H5BasFile
 import H5CmpFile
 import SWAligner
 from tt_log import logger
+
+# Defaults for command line parameters -- see getParms()
 
 DEF_SCORE_THRESHOLD  = 750
 DEF_HQ_LENGTH        = 50
@@ -50,6 +57,17 @@ def main ():
                                   movieName=bf.movieName(),
                                   maxHole=bf.maxZMW())
 
+    cmpCCS = None
+    
+    if opt.ccs is not None:         # was a CCS cmp.h5 file specified?
+        
+        cmpCCSFilename = opt.ccs
+        logger.debug("CCS cmp file: %s" % cmpCCSFilename)
+        cfCCS  = H5CmpFile.CmpFile (fileName=cmpCCSFilename)
+        cmpCCS = H5CmpFile.CmpMovie (cmpObject=cfCCS,
+                                     movieName=bf.movieName(),
+                                     maxHole=bf.maxZMW())
+
     aln = SWAligner.Aligner()           # we'll use this in the loop below for finding adapters
     aln.setRead (H5BasFile.ADAPTER)     # adapter sequence is query
     minAdapterScore = opt.adapter * aln.getPenalties()[0] / 2
@@ -58,11 +76,13 @@ def main ():
     print "     from         to   off  astart  aend+1   mm  ins del    Q"
     print
 
-    for hole in bf.holeNumbers():
+    for hole in bf.holeNumbers():          # main loop!
 
         numBases = bf.readLen(hole)
         zStat    = bf.holeStatusStr(hole)  # this is a string, not a number
         zProd    = bf.productivity(hole)
+
+        numGoodInserts = 0
 
         HQStart, HQEnd, HQScore = bf.HQregion(hole)[2:5]
 
@@ -101,29 +121,19 @@ def main ():
                 insSize = end - start
 
                 align = None
-                if cmp is not None:
+                if cmp is not None:                                       # if a cmp.h5 was supplied
                     align = cmp.getAlignmentByPosition (hole, start, end) # alignment record for this region
 
                 if align is not None:                                     # if the region aligned
 
+                    numGoodInserts += 1
+
                     flag = 'I+'
                     print "%-2s  %5d %5d  %5d"  % (flag, start, end, insSize),
-
-                    # Compute the Q score for the aligned insert,
-                    # according to the (rather strict) PacBio
-                    # formulation where each mismatched, inserted or
-                    # deleted base is an error.
 
                     rStart, rEnd = align['rStart'], align['rEnd']   # fetch once, used many times
                     alnLen = rEnd-rStart
                     nMM, nIns, nDel = align['nMM'], align['nIns'], align['nDel']
-                    totErrors = nMM + nIns + nDel
-                    if totErrors == 0:
-                        Q = 40.0
-                    elif alnLen <= 0:
-                        Q = 0.0
-                    else:
-                        Q = -10.0 * math.log10 (float(totErrors) / float(alnLen))
 
                     print "%5d  %2d %1s  %9d  %9d  %4d  %6d  %6d  %3d %4d %3d %4.1f" % \
                         (alnLen,                               # length of aligned portion of read
@@ -133,10 +143,11 @@ def main ():
                          rStart-start,                         # offset of alignment start into insert
                          rStart, rEnd,
                          nMM, nIns, nDel,                      # # of mismatches, insertions, deletions
-                         Q),                                   # read quality Q score for insert
+                         getQ (align)),                        # read quality Q score for insert
 
                 elif insSize > opt.adapter * 2:                # if it's a non-descript, non-aligned region
                                                                # TODO: Make the '2' a parameter
+                    numGoodInserts += 1
 
                     flag = 'I ' if inHQ else 'i '
                     print "%-2s  %5d %5d  %5d"  % (flag, start, end, insSize),
@@ -146,7 +157,7 @@ def main ():
                     flag = 'Is' if inHQ else 'is'
                     print "%-2s  %5d %5d  %5d"  % (flag, start, end, insSize),
 
-                else:                                          # see if it's really an adapter
+                else:                                          # see if it's really an adapter that wasn't called
 
                     sequence = bf.getSequence(hole, start, end)
                     aln.setRef (sequence)
@@ -169,12 +180,13 @@ def main ():
                 raise ValueError ("unrecognised region type %d in ZMW %d" % (regionType, hole))
 
         if not opt.nocons:
-            printPassesForHole (bf, hole)       # process consensus read passes
+            if zProd == 1 and bf.isSequencingZMW(hole):
+                printCCSDataForHole (bf, hole, numGoodInserts, cmpCCS)       # process consensus read passes
 
     logger.debug("complete")
 
-def printPassesForHole (bf, hole):
-    '''Print consensus read passes for specified hole.'''
+def printCCSDataForHole (bf, hole, numGoodInserts, cmpCCS):
+    '''Print consensus read info for specified hole.'''
 
     zStat   = bf.holeStatusStr(hole)  # this is a string, not a number
     zProd   = bf.productivity(hole)
@@ -193,11 +205,66 @@ def printPassesForHole (bf, hole):
         print "%6d          %-5s  %d" % (hole, zStat, zProd),
         print "c   %5d %5d  %5d        %s%s %s" % (start, end, numBases, before, after, dir)
 
-    if consLen > 0:
-        print "%6d          %-5s  %d" % (hole, zStat, zProd),
-        print "C                %5d" % (consLen)
+    if consLen > 0:                 # if there is a CCS read
+
+        numP = bf.numConsensusPasses(hole)
+        avgQ = bf.getConsensusAverageQuality(hole)
+
+        align = None
+        if cmpCCS is not None:
+
+            alignments = [ a for a in cmpCCS.getAlignmentsForHole (hole) ]     # get all alignments from generator
+            numAlign = len(alignments)
+            if numAlign > 1:
+                raise RuntimeError ('more than one CCS alignment found for hole %d' % hole)
+            if numAlign == 1:
+                align = alignments[0]
+
+        if align is None:
+            print "%6d          %-5s  %d" % (hole, zStat, zProd),
+            print "CC               %5d  %2d  %2d" % (consLen, numP, avgQ)
+        else:
+
+            print "%6d          %-5s  %d" % (hole, zStat, zProd),
+            print "C+               %5d  %2d  %2d" % (consLen, numP, avgQ),
+
+            rStart, rEnd = align['rStart'], align['rEnd']
+            alnLen = rEnd-rStart
+            nMM, nIns, nDel = align['nMM'], align['nIns'], align['nDel']
+
+            print "%5d  %2d %1s  %9d  %9d  %6d  %6d  %3d %4d %3d %4.1f" % \
+                (alnLen,                               # length of aligned portion of read
+                 align['contig'],                      # chr/contig id (see H5CmpFile)
+                 '-' if align['RCRefStrand'] else '+', # strand
+                 align['tStart'], align['tEnd'],       # reference offset of start/end of alignment
+                 rStart, rEnd,                         # CCS read offset of start/end of alignment
+                 nMM, nIns, nDel,                      # # of mismatches, insertions, deletions
+                 getQ (align)),                        # read quality Q score for insert
+
+    elif numGoodInserts > 2:                           # why didn't this guy get a CCS read?
+        print "%6d          %-5s  %d C?" % (hole, zStat, zProd)
 
     return
+
+def getQ (align):
+    '''Compute alignment quality as a Q score.'''
+
+    # Compute the Q score for the aligned insert, according to the
+    # (rather strict) PacBio formulation where each mismatched,
+    # inserted or deleted base is an error.
+
+    rStart, rEnd = align['rStart'], align['rEnd']
+    alnLen = rEnd-rStart
+    nMM, nIns, nDel = align['nMM'], align['nIns'], align['nDel']
+    totErrors = nMM + nIns + nDel
+    if totErrors == 0:
+        Q = 40.0
+    elif alnLen <= 0:
+        Q = 0.0
+    else:
+        Q = -10.0 * math.log10 (float(totErrors) / float(alnLen))
+
+    return Q
 
 def getParms ():                       # use default input sys.argv[1:]
 
@@ -207,6 +274,7 @@ def getParms ():                       # use default input sys.argv[1:]
     parser.add_option ('--score',    type='int', help='minimum HQ region score (def: %default)')
     parser.add_option ('--length',   type='int', help='minimum HQ region length (def: %default)')
     parser.add_option ('--adapter',  type='int', help='expected adapter length (def: %default)')
+    parser.add_option ('--ccs',                  help='cmp.h5 file for CCS alignments')
     parser.add_option ('--nocons',   action='store_true', help='do not print consensus passes lines')
 
     parser.set_defaults (score=DEF_SCORE_THRESHOLD,
@@ -237,7 +305,8 @@ def lineHelp ():
          a   Adapter outside HQ region
 
      CO: c   Consensus read pass
-         C   Consensus read length
+         CC  Consensus read length
+         C?  Missing consensus read
 
  Insert line columns:
 
