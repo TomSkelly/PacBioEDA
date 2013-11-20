@@ -70,6 +70,7 @@ def main ():
     HQLenC   = Counter('------HQ Len >= %s' % opt.length)
     HQScoreC = Counter('--------HQ Score >= %s' % opt.score)
     adaptC   = Counter('----------Avg Insert >= %s' % opt.insert)
+    consC    = Counter('------------Consensus Reads')
     alignC   = Counter('------------Aligned')
     prod2C   = Counter('----Productivity-2')
 
@@ -145,6 +146,11 @@ def main ():
                         HQScoreC.incr (1, numSubreads, numBases)
                         HQScoreC.longest (hole, maxSubreadLen)
 
+                        consLen = bf.consReadLen(hole)
+                        if consLen > 0:
+                            consC.incr (1, bf.numConsensusPasses(hole), consLen)
+                            consC.longest (hole, consLen)
+
                         # A very short average insert size probably indicates an adapter dimer.
 
                         if cumSubreadLen >= numSubreads * opt.insert:
@@ -166,10 +172,10 @@ def main ():
     Counter.title();
 
     if cmp is not None:                 # if we processed a .cmp.h5 file
-        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC, alignC):
+        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC, consC, alignC):
             cntr.longPrint()
     else:
-        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC):
+        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC, consC):
             cntr.longPrint()
     print
 
@@ -221,14 +227,14 @@ class Counter (object):
     @staticmethod
     def title ():
 
-        print "reads subreads      bases    avg     max    ZMW  criterion"
+        print " reads subreads      bases    avg     max     ZMW  criterion"
         print
 
     def longPrint (self):
 
         avgLen = self._numBases / self._numSubreads if self._numSubreads > 0 else 0
 
-        print "%5d  %7d  %9d  %5d  %6d  %5d  %s" \
+        print "%6d  %7d  %9d  %5d  %6d  %6d  %s" \
             % (self._numReads, self._numSubreads, self._numBases, avgLen, self._maxLen, self._whichZMW, self._name)
 
 if __name__ == "__main__":
