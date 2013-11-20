@@ -71,7 +71,6 @@ class BasFile (object):
         if 'MultiPart' not in self._top:       # if this is an old-style bas file
             bf = BaxFile(filename)
             self._baxfile.append(bf)           # only one file (this one) in the list
-####            self._maxZMW = bf._maxZMW
 
         else:                                  # else it's an index to a set of bax files
 
