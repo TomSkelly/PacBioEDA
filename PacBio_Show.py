@@ -20,7 +20,7 @@ def main ():
 
     basFilename = args[0]
     logger.debug("bas file: %s" % basFilename)
-    basfile = H5BasFile.BasFile (basFilename)
+    bf = H5BasFile.BasFile (basFilename)
 
     try:
         hole = int(args[1])
@@ -28,28 +28,45 @@ def main ():
         logger.error('ERROR: second parameter must be an integer ZMW number')
         sys.exit()
 
-    if not opt.reverse:
-        sequence = basfile.getSequence(hole, opt.start, opt.end)    # end==None gets the whole read
+    if opt.subreads:
+
+        for region in bf.holeRegions(hole):
+            regionHole, regionType, start, end, score = region
+            if regionType == 1:                              # a subread?
+                printRange (bf, hole, opt, start, end)
+
     else:
-        sequence = basfile.getRevCompSequence(hole, opt.start, opt.end)
-
-    movie = basfile.movieName()
-    length = len(sequence)
-    print ">%s/%d/%d_%d" % (movie, hole, opt.start, opt.start+length)
-
-    for ix in xrange(0,length,opt.flen):
-        print sequence[ix:ix+opt.flen]
+        printRange (bf, hole, opt, opt.start, opt.end)
 
     logger.debug("complete")
 
+def printRange (bf, hole, opt, start, end):
+    '''Print a specified range of basecalls in fasta format.'''
+
+    if not opt.reverse:
+        sequence = bf.getSequence(hole, start, end)    # end==None gets the whole read
+    else:
+        sequence = bf.getRevCompSequence(hole, start, end)
+
+    movie = bf.movieName()
+    length = len(sequence)
+    print ">%s/%d/%d_%d" % (movie, hole, start, start+length)
+
+    for ix in xrange(0,length,opt.flen):
+        print sequence[ix:ix+opt.flen]          # this WILL print the final partial line
+
+    return
+
 def getParms ():                       # use default input sys.argv[1:]
 
-    parser = optparse.OptionParser(usage='%prog [options] <bas_file> <ZMW#>')
+    parser = optparse.OptionParser(usage='%prog [options] <bas_file> <ZMW#>',
+                                   description='Print a range of sequence from a specified ZMW in fasta format')
 
     parser.add_option ('--start',     type='int', help='0-based start offset of output into read (def: %default)')
     parser.add_option ('--end',       type='int', help='0-based end offset of output into read (def: all)')
     parser.add_option ('--fasta-len', type='int', help='Number of bases in output fasta line (def: %default)', dest='flen')
-    parser.add_option ('--reverse', action='store_true', help='output reverse-complement of region')
+    parser.add_option ('--reverse',  action='store_true', help='Output reverse-complement of region')
+    parser.add_option ('--subreads', action='store_true', help='Print one contig per subread')
 
     parser.set_defaults (start=0,
                          end=None,
