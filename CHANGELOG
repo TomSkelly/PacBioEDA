@@ -1,3 +1,13 @@
+2013-11-20:
+~~~~~~~~~~
+
+I'm now in the US at the NIH's Frederick National Laboratory for
+Cancer Research: thomas.skelly@nih.gov.
+
+Added logic to accommodate the bas/bax file split. Should be backward
+compatible with the old single bas file architecture.
+
+
 2012-09-10:
 ~~~~~~~~~~
 
