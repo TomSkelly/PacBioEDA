@@ -16,7 +16,9 @@
 #             Reads with HQ region length > threshold
 #               Reads with HQ score > threshold
 #                 Reads with average insert size > threshold (i.e., not adapter dimers)
+#                 High-quality regions
 #                   Reads which aligned (if a .cmp.h5 file was supplied)
+#                   Consensus reads
 
 # All of the above except average insert size are criteria applied by
 # the filtering step of secondary analysis.
@@ -50,13 +52,19 @@ def main ():
 
     basFilename = args[0]
     logger.debug("bas file: %s" % basFilename)
-    bf = H5BasFile.BasFile (basFilename)
+    bf = H5BasFile.BasFile (basFilename, CCSDir=opt.ccs)
+
+    if bf.hasConsensus():           # don't go looking for CCS data if it's not there
+        nocons = False
+    else:
+        logger.warning('no ccs data found: point to it with --ccs if desired')
+        nocons = True
 
     cmp = None                      # no cmp file?
 
-    if len(args) > 1:
+    if opt.aln is not None:         # was a subread cmp.h5 file specified?
         
-        cmpFilename = args[1]
+        cmpFilename = opt.aln
         logger.debug("cmp file: %s" % cmpFilename)
         cf  = H5CmpFile.CmpFile (fileName=cmpFilename)
         cmp = H5CmpFile.CmpMovie (cmpObject=cf,
@@ -70,8 +78,9 @@ def main ():
     HQLenC   = Counter('------HQ Len >= %s' % opt.length)
     HQScoreC = Counter('--------HQ Score >= %s' % opt.score)
     adaptC   = Counter('----------Avg Insert >= %s' % opt.insert)
-    consC    = Counter('------------Consensus Reads')
+    HQBasesC = Counter('----------HQ Bases')
     alignC   = Counter('------------Aligned')
+    consC    = Counter('------------Consensus Reads')
     prod2C   = Counter('----Productivity-2')
 
     longest    = 0
@@ -90,6 +99,7 @@ def main ():
         HQLen = HQEnd - HQStart
 
         numSubreads     = 0
+        numHQSubreads   = 0
         maxSubreadLen   = 0
         cumSubreadLen   = 0
         alignedSubreads = 0
@@ -99,10 +109,14 @@ def main ():
         for region in bf.holeRegions(hole):
 
             regionHole, regionType, start, end, score = region
+            inHQ = end > HQStart and start < HQEnd    # does region overlap HQ?
+
             if regionType == 1:                       # if insert
                 numSubreads += 1
                 maxSubreadLen  = max (end-start, maxSubreadLen)
                 cumSubreadLen += max (end-start, 0)   # clip negative lengths to zero
+                if inHQ:
+                    numHQSubreads += 1
 
                 if cmp is not None:
                     align = cmp.getAlignmentByPosition (hole, start, end) # alignment record for this region
@@ -146,20 +160,24 @@ def main ():
                         HQScoreC.incr (1, numSubreads, numBases)
                         HQScoreC.longest (hole, maxSubreadLen)
 
-                        consLen = bf.consReadLen(hole)
-                        if consLen > 0:
-                            consC.incr (1, bf.numConsensusPasses(hole), consLen)
-                            consC.longest (hole, consLen)
-
                         # A very short average insert size probably indicates an adapter dimer.
 
                         if cumSubreadLen >= numSubreads * opt.insert:
                             adaptC.incr (1, numSubreads, numBases)
                             adaptC.longest (hole, maxSubreadLen)
 
+                            HQBasesC.incr (1, numHQSubreads, HQLen)               # 
+                            HQBasesC.longest (hole, HQLen)
+
                             if alignedSubreads > 0:
                                 alignC.incr (1, alignedSubreads, alignedTotBases)     # total aligned bases
                                 alignC.longest (hole, alignedMaxBases)                # longest single alignment
+
+                        if not nocons:
+                            consLen = bf.consReadLen(hole)
+                            if consLen > 0:
+                                consC.incr (1, bf.numConsensusPasses(hole), consLen)
+                                consC.longest (hole, consLen)
 
     print
     print "file: ", basFilename
@@ -172,10 +190,10 @@ def main ():
     Counter.title();
 
     if cmp is not None:                 # if we processed a .cmp.h5 file
-        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC, consC, alignC):
+        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC, HQBasesC, consC, alignC):
             cntr.longPrint()
     else:
-        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC, consC):
+        for cntr in (totalC, seqC, prod0C, prod2C, prod1C, HQLenC, HQScoreC, adaptC, HQBasesC, consC):
             cntr.longPrint()
     print
 
@@ -186,6 +204,8 @@ def getParms ():                       # use default input sys.argv[1:]
     parser = optparse.OptionParser(usage='%prog [options] <bas_file> [<cmp_file>]',
                                    description='Print (to stdout) summary information about the contents of a bas.h5 file.')
 
+    parser.add_option ('--ccs',                help='directory containing ccs.h5 files for CCS reads, post-2.1.0')
+    parser.add_option ('--aln',                help='cmp.h5 file for subread alignments')
     parser.add_option ('--score',  type='int', help='Minimum HQ region score (def: %default)')
     parser.add_option ('--length', type='int', help='Minimum HQ region length (def: %default)')
     parser.add_option ('--insert', type='int', help='Minimum average insert length (def: %default)')
@@ -195,6 +215,10 @@ def getParms ():                       # use default input sys.argv[1:]
                          insert=DEF_INSERT_THRESHOLD)
 
     opt, args = parser.parse_args()
+
+    if len(args) > 1:
+        logger.warning ('WARNING: alignments cmp.h5 file should now be specified with --aln keyword')
+        opt.aln = args.pop()      # put it where it belongs
 
     return opt, args
 
@@ -227,14 +251,14 @@ class Counter (object):
     @staticmethod
     def title ():
 
-        print " reads subreads      bases    avg     max     ZMW  criterion"
+        print " reads subreads       bases    avg     max     ZMW  criterion"
         print
 
     def longPrint (self):
 
         avgLen = self._numBases / self._numSubreads if self._numSubreads > 0 else 0
 
-        print "%6d  %7d  %9d  %5d  %6d  %6d  %s" \
+        print "%6d  %7d  %10d  %5d  %6d  %6d  %s" \
             % (self._numReads, self._numSubreads, self._numBases, avgLen, self._maxLen, self._whichZMW, self._name)
 
 if __name__ == "__main__":

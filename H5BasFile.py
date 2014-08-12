@@ -53,13 +53,14 @@ COMPLEMENTS[ord('G')] = 'C'
 COMPLEMENTS[ord('T')] = 'A'
 COMPLEMENTS[ord('N')] = 'N'
 
-class BasFile (object):
+class BasFile (object):    # see header comments describing this class
 
-    def __init__ (self, filename, regions=True):
+    def __init__ (self, filename, CCSDir=None):
 
         logger.debug('creating BasFile object')
 
         self._filename  = filename
+        self._CCSDir    = CCSDir
         self._infile    = h5py.File (filename, 'r')
         self._top       = self._infile
         self._baxfile   = list()
@@ -69,7 +70,7 @@ class BasFile (object):
         self._consPassIndex  = None
 
         if 'MultiPart' not in self._top:       # if this is an old-style bas file
-            bf = BaxFile(filename)
+            bf = BaxFile(filename)             # file will contain its own CCSdata
             self._baxfile.append(bf)           # only one file (this one) in the list
 
         else:                                  # else it's an index to a set of bax files
@@ -79,25 +80,26 @@ class BasFile (object):
             for baxfileName in self._top['MultiPart/Parts']:      # for each bax file
 
                 fqBaxfileName = os.path.join(h5Dir, baxfileName)  # fq = fully qualified
-                bf = BaxFile(fqBaxfileName)
+                bf = BaxFile(fqBaxfileName, CCSDir=CCSDir)
                 self._baxfile.append(bf)       # add file to list
 
-        self.fillMaxZMW()                      # need to compute this first, we'll need it later
+        self.fillCombinedFields()              # need to compute this first, we'll need it later
         self.fillZMWIndexes()
         self.fillMovieName()
+        self.fillRegionIndexes()
 
-        if regions:                            # caller may tell us he doesn't need regions
-            self.fillRegionIndexes()
-
-    def fillMaxZMW (self):
-        '''Called from __init__ to compute _maxZMW and _numZMWs.'''
+    def fillCombinedFields (self):
+        '''Called from __init__ to compute aggregated fields across all ax files.'''
 
         self._maxZMW  = 0
         self._numZMWs = 0
+        self._hasConsensus = True
 
         for bf in self._baxfile:
             self._maxZMW = max (self._maxZMW, bf._maxZMW)     # largest ZMW#
             self._numZMWs += bf.numZMWs()                     # count of ZMWs
+            if not bf.hasConsensus():
+                self._hasConsensus = False
 
         logger.debug("largest ZMW# is %d" % self._maxZMW)
 
@@ -195,7 +197,7 @@ class BasFile (object):
             elif self._movieName != bf._movieName:
                 raise RuntimeError ('bax file movie names are different')
 
-        match = re.search('_s(\d+)_p(\d+)$', self._movieName)
+        match = re.search('_s(\d+)_[pX](\d+)$', self._movieName)
         self._setNumber    = int(match.group(1))        # match.group(0) is entire match
         self._strobeNumber = int(match.group(2))
 
@@ -226,6 +228,9 @@ class BasFile (object):
 
     def numZMWs (self):        # number of ZMWs reported in file, not necessarily numbered 0..N-1
         return self._numZMWs
+
+    def hasConsensus (self):
+        return self._hasConsensus
 
     def holeStatusStr (self, hole):               # returns a string
         bf    = self._baxByHole[hole]
@@ -539,11 +544,11 @@ class BasFile (object):
 
         return sum(baseData[index+start:index+end]) / (end-start)
 
-class BaxFile (object):
+class BaxFile (object):   # see header comments describing this class
 
     fileNum = 0           # class variable to count files
 
-    def __init__ (self, filename):
+    def __init__ (self, filename, CCSDir=None):
 
         BaxFile.fileNum += 1
         self._shortName = 'bax-%d' % BaxFile.fileNum
@@ -551,9 +556,11 @@ class BaxFile (object):
         logger.debug("creating BaxFile object for %s = %s" % (self._shortName, filename))
 
         self._filename      = filename
+        self._CCSDir        = CCSDir
         self._infile        = h5py.File (filename, 'r')
         self._top           = self._infile         # h5py 2.0.1 change!
 
+        self._pulsedata     = self._top["PulseData"]
         self._basecalls     = self._top["PulseData/BaseCalls"]
         self._ZMW           = self._top["PulseData/BaseCalls/ZMW"]
         self._regions       = self._top["PulseData/Regions"]
@@ -569,12 +576,7 @@ class BaxFile (object):
                                       
         self._sanityChecked = False
 
-        if "PulseData/ConsensusBaseCalls" in self._top:
-            self._consBasecalls = self._top["PulseData/ConsensusBaseCalls"]
-            self._consZMW       = self._top["PulseData/ConsensusBaseCalls/ZMW"]
-            self._consPasses    = self._top["PulseData/ConsensusBaseCalls/Passes"]
-        else:
-            logger.info('BaxFile %s does not contain consensus data (rel 2.1.0 and later)' % self._shortName)
+        self.findCCSFile()
 
     def __del__ (self):
         self._infile.close()
@@ -591,6 +593,41 @@ class BaxFile (object):
     def holeNumbers (self):
         '''Return HDF5 array of hole numbers which actually exist in /PulseData/BaseCalls/ZMW/HoleNumber.'''
         return self._ZMW["HoleNumber"]
+
+    def hasConsensus (self):
+        return self._hasConsensus
+
+    def findCCSFile (self):
+        '''Given a directory to look in, find the ccs.h5 file that contains consensus reads for this bax file.'''
+
+        self._hasConsensus  = False                         # until proven otherwise
+
+        if "PulseData/ConsensusBaseCalls" in self._top:     # if this is an older bax file, in contains its own CCS data
+
+            self._consBasecalls = self._top["PulseData/ConsensusBaseCalls"]
+            self._consZMW       = self._top["PulseData/ConsensusBaseCalls/ZMW"]
+            self._consPasses    = self._top["PulseData/ConsensusBaseCalls/Passes"]
+            self._hasConsensus  = True
+
+        elif self._CCSDir is not None:
+
+            CCSFilename   = os.path.basename(self._filename).replace('bax', 'ccs')
+            fqCCSFilename = os.path.join(self._CCSDir, CCSFilename)
+
+            if os.path.exists(fqCCSFilename):
+
+                self._CCSFile = h5py.File (fqCCSFilename, 'r')
+                self._consBasecalls = self._CCSFile["PulseData/ConsensusBaseCalls"]
+                self._consZMW       = self._CCSFile["PulseData/ConsensusBaseCalls/ZMW"]
+                self._consPasses    = self._CCSFile["PulseData/ConsensusBaseCalls/Passes"]
+                self._hasConsensus  = True
+                logger.debug('BaxFile %s found CCS file %s' % (self._shortName, fqCCSFilename))
+
+            else:
+                logger.warning('%s: no CCS file found corresponding to %s' % (self._shortName, self._filename))
+
+        else:
+            logger.info('BaxFile %s does not contain CCS data (rel 2.1.0 and later). Use --ccs' % self._shortName)
 
     def ZMWSanityClause (self):
         '''The trouble with a lot of code today is that there ain't no sanity clause.'''

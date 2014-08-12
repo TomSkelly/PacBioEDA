@@ -3,16 +3,16 @@
 # Copyright (C) 2011 Genome Research Limited -- See full notice at end
 # of module.
 
+# Author: Tom Skelly (thomas.skelly@nih.gov)
+
 # Print detailed data from *.bas.h5 file and (optionally) the *.cmp.h5
 # alignments file on a region-by-region basis. If a cmp.h5 file is
-# supplied, it prints the alignment outcome for each region. First
-# parameter is input *.bas.h5 file. Optional second parameter is
-# *.cmp.h5 file. Output is to stdout, redirect with >.
+# supplied, output includes the alignment outcome for each region.
 
-# CCS reads are also printed if they exist in the *.bas.h5 file. Note
-# that this will no longer be the case starting with SMRTanalysis
-# release 2.1.0, wherein CCS reads are produced offline in te
-# secondary analysis step.
+# CCS reads are also printed if they exist in the *.bas.h5 file, or if
+# (starting with SMRTanalysis release 2.1.0) the location of the
+# separate *.ccs.files where they reside is supplied as an additional
+# parameter (see --help).
 
 # NOTE: For help in interpreting the various line types printed by
 # this script, do "PacBio_Bas.py --linehelp". Or see the lineHelp
@@ -38,19 +38,20 @@ def main ():
 
     opt, args = getParms()
 
-    if opt.linehelp:
-        lineHelp()
-        sys.exit()
-
     basFilename = args[0]
     logger.debug("bas file: %s" % basFilename)
-    bf = H5BasFile.BasFile (basFilename)
+    bf = H5BasFile.BasFile (basFilename, CCSDir=opt.ccs)
+
+    if not opt.nocons:
+        if not bf.hasConsensus():
+            logger.warning('no ccs data found: turning on --nocons')
+            opt.nocons = True
 
     cmp = None                      # no cmp file?
 
-    if len(args) > 1:
-        
-        cmpFilename = args[1]
+    if opt.aln is not None:         # was a subread cmp.h5 file specified?
+
+        cmpFilename = opt.aln
         logger.debug("cmp file: %s" % cmpFilename)
         cf  = H5CmpFile.CmpFile (fileName=cmpFilename)
         cmp = H5CmpFile.CmpMovie (cmpObject=cf,
@@ -58,10 +59,10 @@ def main ():
                                   maxHole=bf.maxZMW())
 
     cmpCCS = None
-    
-    if opt.ccs is not None:         # was a CCS cmp.h5 file specified?
-        
-        cmpCCSFilename = opt.ccs
+
+    if opt.alnccs is not None:      # was a CCS cmp.h5 file specified?
+
+        cmpCCSFilename = opt.alnccs
         logger.debug("CCS cmp file: %s" % cmpCCSFilename)
         cfCCS  = H5CmpFile.CmpFile (fileName=cmpCCSFilename)
         cmpCCS = H5CmpFile.CmpMovie (cmpObject=cfCCS,
@@ -95,19 +96,21 @@ def main ():
             regionDuration = float(bf.elapsedFrames(hole, start, end)) / H5BasFile.frameRate
             regionBps = (end-start) / regionDuration if regionDuration > 0 else 0
 
-            print "%6d  %6.3f  %-5s  %d"  % (hole, regionBps, zStat, zProd),
-
             if regionType == 0:                                # an adapter region?
 
-                flag = 'A ' if inHQ else 'a '
-                print "%-2s  %5d %5d"  % (flag, start, end)
+                if not opt.noadapt:                            # if we are printing adapter lines
+                    print "%6d  %6.3f  %-5s  %d"  % (hole, regionBps, zStat, zProd),    # these appear in every line
+                    flag = 'A ' if inHQ else 'a '
+                    print "%-2s  %5d %5d"  % (flag, start, end)
 
             elif regionType == 2:                              # a HQ region?
-            
+
+                print "%6d  %6.3f  %-5s  %d"  % (hole, regionBps, zStat, zProd),        # these appear in every line
+
                 if zProd != 1 or not bf.isSequencingZMW(hole) or (HQEnd-HQStart) < opt.length:
                     flag = 'h '
                 else:
-                    flag = 'H+' if score >= opt.score else 'H ' 
+                    flag = 'H+' if score >= opt.score else 'H '
 
                 print "%-2s  %5d %5d"  % (flag, start, end),
 
@@ -117,6 +120,8 @@ def main ():
                     % (score, HQEnd-HQStart, numBases, readDuration, readBps)
 
             elif regionType == 1:                              # a subread?
+
+                print "%6d  %6.3f  %-5s  %d"  % (hole, regionBps, zStat, zProd),        # these appear in every line
 
                 insSize = end - start
 
@@ -179,7 +184,7 @@ def main ():
             else:
                 raise ValueError ("unrecognised region type %d in ZMW %d" % (regionType, hole))
 
-        if not opt.nocons:
+        if not opt.nocons:      # note that opt.nocons gets turned on if no CCS data is found
             if zProd == 1 and bf.isSequencingZMW(hole):
                 printCCSDataForHole (bf, hole, numGoodInserts, cmpCCS)       # process consensus read passes
 
@@ -194,7 +199,7 @@ def printCCSDataForHole (bf, hole, numGoodInserts, cmpCCS):
 
     for passDict in bf.holeConsensusPasses(hole):
 
-        start    = passDict["PassStartBase"] 
+        start    = passDict["PassStartBase"]
         numBases = passDict["PassNumBases"]
         end      = start + numBases
 
@@ -239,7 +244,7 @@ def printCCSDataForHole (bf, hole, numGoodInserts, cmpCCS):
                  align['tStart'], align['tEnd'],       # reference offset of start/end of alignment
                  rStart, rEnd,                         # CCS read offset of start/end of alignment
                  nMM, nIns, nDel,                      # # of mismatches, insertions, deletions
-                 getQ (align)),                        # read quality Q score for insert
+                 getQ (align))                         # read quality Q score for insert
 
     elif numGoodInserts > 2:                           # why didn't this guy get a CCS read?
         print "%6d          %-5s  %d C?" % (hole, zStat, zProd)
@@ -268,13 +273,17 @@ def getQ (align):
 
 def getParms ():                       # use default input sys.argv[1:]
 
-    parser = optparse.OptionParser(usage='%prog [options] <bas_file> [<cmp_file>]')
+    parser = optparse.OptionParser(usage='%prog [options] <bas_file>')
 
     parser.add_option ('--linehelp', action='store_true', help='show line-specific help and exit')
+    parser.add_option ('--filehelp', action='store_true', help='show help for file-related parameters, and exit')
+    parser.add_option ('--ccs',                  help='directory containing ccs.h5 files for CCS reads, post-2.1.0')
+    parser.add_option ('--aln',                  help='cmp.h5 file for subread alignments')
+    parser.add_option ('--alnccs',               help='cmp.h5 file for CCS alignments')
     parser.add_option ('--score',    type='int', help='minimum HQ region score (def: %default)')
     parser.add_option ('--length',   type='int', help='minimum HQ region length (def: %default)')
     parser.add_option ('--adapter',  type='int', help='expected adapter length (def: %default)')
-    parser.add_option ('--ccs',                  help='cmp.h5 file for CCS alignments')
+    parser.add_option ('--noadapt',  action='store_true', help='do not print adapter lines (for brevity)')
     parser.add_option ('--nocons',   action='store_true', help='do not print consensus passes lines')
 
     parser.set_defaults (score=DEF_SCORE_THRESHOLD,
@@ -283,7 +292,80 @@ def getParms ():                       # use default input sys.argv[1:]
 
     opt, args = parser.parse_args()
 
+    if opt.linehelp:
+        lineHelp()
+
+    if opt.filehelp:
+        fileHelp()
+
+    if opt.linehelp or opt.filehelp:
+        sys.exit()
+
+    if len(args) > 1:
+        logger.warning ('WARNING: alignments cmp.h5 file should now be specified with --aln keyword')
+        opt.aln = args.pop()      # put it where it belongs
+
     return opt, args
+
+def fileHelp ():
+
+    print ("""
+This script reads several types of file, as described here. The basic
+output of the script includes data from the bas/bax files. CCS reads,
+subread alignments, and CCS read alignments can also be included by
+specifying the relevant files with command-line keywords.
+
+      *.bas.h5 -- specified as command-line argument (no keyword)
+
+         The top of the tree. This file used to contain the data
+         produced by primary analysis on the instrument. That data has
+         since been progressively federated to other files, so the
+         bas.h5 file is now just an anchor for accessing the real data
+         in those other files.
+
+      *.[123].bax.h5 -- found via bas.h5 file
+
+         The primary analysis data which used to reside in the bas.h5
+         file now lives in three bax.h5 files. Each bax contains data
+         for one third of the ZMWs. The bas.h5 file points to its bax
+         children.
+
+      *.[123].ccs.h5 -- found in directory specified by --ccs keyword
+
+         Prior to release 2.1.0, CCS reads were produced by primary
+         analysis processing on the instrument, and were found in the
+         bax.h5 files. With 2.1.0, CCS creation has been moved to the
+         offline secondary analysis step, under control of a protocol
+         such as ReadOfInsert. Three ccs.h5 files are created,
+         corresponding to the three bax.h5 files.
+
+         If you want ccs data to be included in this script's output,
+         specify the secondary analysis directory where the the ccs.h5
+         files reside, via the --ccs command line keyword.
+
+      aligned_reads.cmp.h5 (subreads) -- specified by --aln keyword
+
+         A typical step in secondary analysis processing is to invoke
+         the blasr aligner to align subreads to a reference. The
+         output of that processing resides in a cmp.h5 file (normally
+         named aligned_reads.cmp.h5).
+
+         If you want alignment results for each subread to be included
+         in this script's output, specify the cmp.h5 file, via the
+         --aln command line keyword.
+
+      aligned_reads.cmp.h5 (ccs reads) -- specified by --alnccs keyword
+
+         CCS reads, once produced, can also be aligned to a reference,
+         using secondary analysis protocols such as Resequencing_ReadsOfInsert.
+         The filename for CCS alignments is also normally aligned_reads.cmp.h5.
+
+         If you want alignment results for each CCS to be included in
+         this script's output, specify the cmp.h5 file, via the
+         --alnccs command line keyword. For data from release 2.1.0
+         and later, you will also need to specify the ccs.h5 file
+         containing those reads, via the --ccs command line keyword.
+          """)
 
 def lineHelp ():
 
