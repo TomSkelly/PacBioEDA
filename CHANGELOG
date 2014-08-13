@@ -1,3 +1,9 @@
+2014-08-12:
+~~~~~~~~~~
+
+Support for consensus reads from separate *.ccs.h5 files.
+
+
 2013-11-20:
 ~~~~~~~~~~
 
